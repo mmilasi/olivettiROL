@@ -1,16 +1,25 @@
-# Created by venv; see https://docs.python.org/3/library/venv.html
-Scripts/
-Include/
-Lib/
+# --- Python & venv ---
+**/venv/
+**/env/
+**/ENV/
+**/__pycache__/
+*.py[cod]
+*$py.class
 
-# Python bytecode files
-*.pyc
-*.pyo
+# --- ENV ---
+.env
+*.env
 
-# Other common files to ignore
+# --- Docker ---
+**/data/db/
 *.log
-__pycache__/
 
-# Python packaging files (if you don't want them tracked)
-*.egg-info/
-pyvenv.cfg
+# --- IDE & OS ---
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# --- GUI & temp ---
+**/cache/
+*.tmp

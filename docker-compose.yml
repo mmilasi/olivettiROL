@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # DATABASE
+  mongodb:
+    image: mongo:latest
+    container_name: attendance_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - attendance_network
+
+  # AUTH SERVICE
+  auth_service:
+    build: ./auth_service
+    container_name: auth_microservice
+    ports:
+      - "5001:5000"
+    depends_on:
+      - mongodb
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/attendance_system
+      - JWT_SECRET=una_chiave_segreta_molto_sicura
+    networks:
+      - attendance_network
+
+networks:
+  attendance_network:
+    driver: bridge
+
+volumes:
+  mongo_data:
