@@ -10,7 +10,7 @@ services:
     volumes:
       - mongo_data:/data/db
     networks:
-      - attendance_network
+      - attendance_net
 
   # AUTH SERVICE
   auth_service:
@@ -21,10 +21,24 @@ services:
     depends_on:
       - mongodb
     environment:
-      - MONGO_URI=mongodb://mongodb:27017/attendance_system
-      - JWT_SECRET=una_chiave_segreta_molto_sicura
+      - MONGO_URI=mongodb://mongodb:27017/attendance_db
+      - JWT_SECRET=super_secret_its
     networks:
-      - attendance_network
+      - attendance_net
+
+  # AI DETECTION
+  detection_service:
+    build: ./detection_service
+    container_name: detection_microservice
+    ports:
+      - "5002:5000"
+    depends_on:
+      - mongodb
+    networks:
+      - attendance_net
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/attendance_db
+      - JWT_SECRET=super_segreto_its
 
 networks:
   attendance_network:
