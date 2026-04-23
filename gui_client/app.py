@@ -1,9 +1,9 @@
 import sys
 import os
 import requests
-from PyQt6.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget, QLabel
+from PyQt6.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QGraphicsOpacityEffect
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
 
 from qfluentwidgets import (FluentWindow, SubtitleLabel, PrimaryPushButton, 
                             InfoBar, InfoBarPosition, Theme, setTheme)
@@ -14,13 +14,15 @@ class AttendanceTotem(FluentWindow):
         super().__init__()
         self.SESSION_URL = "http://127.0.0.1:5001/api/active_session"
         self.DETECT_URL = "http://127.0.0.1:5002/detect"
+        
         self.setWindowTitle("ITS Totem - Terminale Presenze")
-        self.resize(600, 750) 
+        self.resize(500, 700) 
         self.navigationInterface.hide() 
         self.hBoxLayout.setContentsMargins(0, 0, 0, 0)
         self._setup_ui()
         setTheme(Theme.LIGHT)
-        self.set_camera_placeholder()   
+        self.set_camera_placeholder()
+        
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.check_cloud_status)
         self.timer.start(3000)
@@ -28,24 +30,24 @@ class AttendanceTotem(FluentWindow):
     def _setup_ui(self):
         self.central_widget = QWidget()
         self.central_widget.setObjectName("totemInterface") 
+        
         self.layout = QVBoxLayout(self.central_widget)
         self.layout.setContentsMargins(50, 40, 50, 40)
         self.layout.setSpacing(10)
 
-        # --- 1. RIGA 1: STATO E DOCENTE ---
+        # --- 1. RIGA STATO ---
         self.status_container = QWidget()
         self.status_layout = QHBoxLayout(self.status_container)
-        self.status_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_dot = QLabel()
         self.status_dot.setFixedSize(12, 12)
         self.status_dot.setStyleSheet("background-color: #95a5a6; border-radius: 6px;")
-        self.status_text = SubtitleLabel("CONNESSIONE IN CORSO...")
+        self.status_text = SubtitleLabel("CONNESSIONE...")
         self.status_text.setStyleSheet("font-weight: 800; font-size: 20px; margin-left: 10px;")
         self.status_layout.addWidget(self.status_dot)
         self.status_layout.addWidget(self.status_text)
-        self.layout.addWidget(self.status_container)
+        self.layout.addWidget(self.status_container, 0, Qt.AlignmentFlag.AlignCenter)
 
-        # --- 2. RIGA 2: INFO ---
+        # --- 2. INFO LEZIONE ---
         self.combined_info = SubtitleLabel("")
         self.combined_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.combined_info.setStyleSheet("color: #475569; font-weight: 500; font-size: 15px;")
@@ -58,10 +60,9 @@ class AttendanceTotem(FluentWindow):
         self.image_label.setMinimumHeight(400)
         self.layout.addWidget(self.image_label)
 
-        # --- 4. MESSAGGIO RISULTATO ---
+        # --- 4. FEEDBACK SOTTO LA FOTO ---
         self.msg_box = SubtitleLabel("")
         self.msg_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.msg_box.setStyleSheet("font-weight: 600; color: #1e293b; height: 30px;")
         self.layout.addWidget(self.msg_box)
 
         # --- 5. PULSANTE ---
@@ -70,6 +71,7 @@ class AttendanceTotem(FluentWindow):
         self.btn_scan.setFixedHeight(60)
         self.btn_scan.clicked.connect(self.run_detection)
         self.layout.addWidget(self.btn_scan, 0, Qt.AlignmentFlag.AlignCenter)
+
         self.addSubInterface(self.central_widget, FIF.HOME, 'Totem')
 
     def set_camera_placeholder(self):
@@ -78,12 +80,13 @@ class AttendanceTotem(FluentWindow):
             <div style='text-align: center;'>
                 <p style='font-size: 60px; margin-bottom: 20px;'>📷</p>
                 <p style='font-size: 18px; font-weight: 800; color: #1e293b; margin-bottom: 5px;'>INQUADRARE IL VOLTO</p>
-                <p style='font-size: 13px; color: #64748b; font-weight: 400;'>pronto per la scansione</p>
+                <p style='font-size: 13px; color: #64748b;'>pronto per la scansione</p>
             </div>
         """
         self.image_label.setText(placeholder_html)
         self.image_label.setStyleSheet("border: 2px dashed #cbd5e1; border-radius: 28px; background: #f8fafc;")
         self.msg_box.setText("")
+        self.msg_box.setStyleSheet("font-weight: 600; color: #1e293b; font-size: 16px;")
 
     def check_cloud_status(self):
         try:
@@ -97,45 +100,85 @@ class AttendanceTotem(FluentWindow):
                     self.btn_scan.setEnabled(True)
                 else:
                     self.status_dot.setStyleSheet("background-color: #e74c3c; border-radius: 6px;")
-                    self.status_text.setText("IN ATTESA DI ATTIVAZIONE...")
-                    self.combined_info.setText("Sessione non attiva dalla Dashboard")
+                    self.status_text.setText("NON ATTIVO")
+                    self.combined_info.setText("Sessione non attiva")
                     self.btn_scan.setEnabled(False)
-        except Exception:
-            self.status_text.setText("⚠️ ERRORE CLOUD")
+        except:
+            self.status_text.setText("⚠️ OFFLINE")
+
+    def show_animated_info(self, is_success, message):
+        """Gestisce la creazione, l'animazione e la rimozione dell'InfoBar"""
+        if is_success:
+            info = InfoBar.success(
+                title="Rilevato",
+                content=message,
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.NONE,
+                duration=-1,
+                parent=self
+            )
+        else:
+            info = InfoBar.error(
+                title="Errore",
+                content=message,
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.NONE,
+                duration=-1,
+                parent=self
+            )
+
+        info.show()
+        x = (self.width() - info.width()) // 2
+        y = (self.height() - info.height()) // 2
+        info.move(x, y)
+
+        opacity_effect = QGraphicsOpacityEffect(info)
+        info.setGraphicsEffect(opacity_effect)
+
+        self.fade_in = QPropertyAnimation(opacity_effect, b"opacity")
+        self.fade_in.setDuration(800)
+        self.fade_in.setStartValue(0)
+        self.fade_in.setEndValue(1)
+        self.fade_in.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        self.fade_in.start()
+
+        def start_fade_out():
+            self.fade_out = QPropertyAnimation(opacity_effect, b"opacity")
+            self.fade_out.setDuration(800)
+            self.fade_out.setStartValue(1)
+            self.fade_out.setEndValue(0)
+            self.fade_out.setEasingCurve(QEasingCurve.Type.InOutQuad)
+            self.fade_out.finished.connect(info.deleteLater)
+            self.fade_out.finished.connect(self.set_camera_placeholder)
+            self.fade_out.start()
+
+        QTimer.singleShot(3800, start_fade_out)
 
     def run_detection(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(current_dir)
         students_dir = os.path.join(project_root, "img_students")
-        if not os.path.exists(students_dir):
-            students_dir = current_dir
 
-        path, _ = QFileDialog.getOpenFileName(
-            self, 
-            "Scansione Facciale - Seleziona Studente", 
-            students_dir, 
-            "Images (*.jpg *.png)"
-        )
+        path, _ = QFileDialog.getOpenFileName(self, "Camera", students_dir, "Images (*.jpg *.png)")
         if not path: return
-        
-        pixmap = QPixmap(path)
-        self.image_label.setPixmap(pixmap.scaled(self.image_label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        self.image_label.setPixmap(QPixmap(path).scaled(self.image_label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         self.image_label.setText("")
         self.image_label.setStyleSheet("border: 2px solid #4f46e5; border-radius: 28px; background: #000;")
+        self.msg_box.setText("")
 
         try:
             with open(path, 'rb') as f:
                 res = requests.post(self.DETECT_URL, files={'image': f}, timeout=5)
                 data = res.json()
-                if res.status_code == 200:
-                    self.msg_box.setText(f"{data['status']}: {data['student_name']}")
-                    InfoBar.success(title="Successo", content=data['message'], parent=self)
-                else:
-                    self.msg_box.setText("ACCESSO NEGATO")
-                    InfoBar.error(title="Errore", content=data['message'], parent=self)
-            QTimer.singleShot(5000, self.set_camera_placeholder)
-        except Exception:
-            InfoBar.warning(title="Offline", content="Server non raggiungibile", parent=self)
+                is_success = (res.status_code == 200)
+                QTimer.singleShot(1500, lambda: self.show_animated_info(is_success, data['message']))
+
+        except Exception as e:
+            w = InfoBar.warning(title="Offline", content="Server non raggiungibile", position=InfoBarPosition.NONE, parent=self)
+            w.show()
+            w.move((self.width() - w.width()) // 2, (self.height() - w.height()) // 2)
             QTimer.singleShot(2000, self.set_camera_placeholder)
 
 if __name__ == "__main__":

@@ -2,12 +2,10 @@
 setlocal enabledelayedexpansion
 title ITS Attendance - Lazy Launcher
 
-:: --- RIGA MAGICA PER IL PERCORSO ---
 cd /d "%~dp0"
-:: -----------------------------------
 
 echo ============================================================
-echo    VERIFICA REQUISITI DI SISTEMA (FIX ADMIN PATH)
+echo    VERIFICA REQUISITI DI SISTEMA
 echo ============================================================
 
 :: 1. Verifica Permessi Admin
