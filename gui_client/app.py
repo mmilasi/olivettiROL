@@ -43,7 +43,7 @@ class AttendanceTotem(FluentWindow):
         self.status_layout.addWidget(self.status_text)
         self.layout.addWidget(self.status_container)
 
-        # --- 2. RIGA 2: INFO COMPATTE  ---
+        # --- 2. RIGA 2: INFO COMPATTE ---
         self.combined_info = SubtitleLabel("")
         self.combined_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.combined_info.setStyleSheet("color: #475569; font-weight: 500; font-size: 15px;")
@@ -51,31 +51,46 @@ class AttendanceTotem(FluentWindow):
         self.layout.addSpacing(10)
 
         # --- 3. AREA CAMERA ---
-        self.image_label = SubtitleLabel("Inquadrare il volto")
+        self.image_label = SubtitleLabel()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setMinimumHeight(400)
-        self.image_label.setStyleSheet("""
-            border: 2px solid #e2e8f0; 
-            border-radius: 24px; 
-            background: #f8fafc;
-            color: #94a3b8;
-        """)
         self.layout.addWidget(self.image_label)
 
-        # --- 4. MESSAGGIO RISULTATO E PULSANTE ---
+        # --- 4. MESSAGGIO RISULTATO ---
         self.msg_box = SubtitleLabel("")
         self.msg_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.msg_box.setStyleSheet("font-weight: 600; color: #1e293b;")
+        self.msg_box.setStyleSheet("font-weight: 600; color: #1e293b; height: 30px;")
         self.layout.addWidget(self.msg_box)
-        self.btn_container = QHBoxLayout()
-        self.btn_container.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # --- 5. PULSANTE ---
         self.btn_scan = PrimaryPushButton(FIF.PEOPLE, "Scansione Facciale")
         self.btn_scan.setFixedWidth(300)
         self.btn_scan.setFixedHeight(60)
         self.btn_scan.clicked.connect(self.run_detection)
-        self.btn_container.addWidget(self.btn_scan)
-        self.layout.addLayout(self.btn_container)
+        self.layout.addWidget(self.btn_scan, 0, Qt.AlignmentFlag.AlignCenter)
+        self.set_camera_placeholder()
         self.addSubInterface(self.central_widget, FIF.HOME, 'Totem')
+
+    def set_camera_placeholder(self):
+        """Ripristina la grafica di attesa con icona e testo formattato"""
+        self.image_label.setPixmap(QPixmap())
+        
+        # HTML per simulare òa grafica
+        placeholder_html = """
+            <div style='text-align: center;'>
+                <p style='font-size: 60px; margin-bottom: 20px;'>📷</p>
+                <p style='font-size: 18px; font-weight: 800; color: #1e293b; margin-bottom: 5px;'>INQUADRARE IL VOLTO</p>
+                <p style='font-size: 13px; color: #64748b; font-weight: 400;'>pronto per la scansione</p>
+            </div>
+        """
+        self.image_label.setText(placeholder_html)
+        
+        self.image_label.setStyleSheet("""
+            border: 2px dashed #cbd5e1; 
+            border-radius: 28px; 
+            background: #f8fafc;
+        """)
+        self.msg_box.setText("")
 
     def check_cloud_status(self):
         try:
@@ -85,8 +100,7 @@ class AttendanceTotem(FluentWindow):
                 if data.get("active"):
                     self.status_dot.setStyleSheet("background-color: #2ecc71; border-radius: 6px;")
                     self.status_text.setText(f"PRONTO - {data['teacher_display'].upper()}")
-                    info_text = f"{data['subject']} --- {data['description']} --- {data['range']}"
-                    self.combined_info.setText(info_text)
+                    self.combined_info.setText(f"{data['subject']} - {data['description']} - {data['range']}")
                     self.btn_scan.setEnabled(True)
                 else:
                     self.status_dot.setStyleSheet("background-color: #e74c3c; border-radius: 6px;")
@@ -95,7 +109,6 @@ class AttendanceTotem(FluentWindow):
                     self.btn_scan.setEnabled(False)
         except Exception:
             self.status_text.setText("⚠️ ERRORE CLOUD")
-            self.combined_info.setText("")
             self.status_dot.setStyleSheet("background-color: #95a5a6; border-radius: 6px;")
 
     def run_detection(self):
@@ -105,6 +118,7 @@ class AttendanceTotem(FluentWindow):
         pixmap = QPixmap(path)
         self.image_label.setPixmap(pixmap.scaled(self.image_label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         self.image_label.setText("")
+        self.image_label.setStyleSheet("border: 2px solid #4f46e5; border-radius: 28px; background: #000;")
 
         try:
             with open(path, 'rb') as f:
@@ -112,36 +126,17 @@ class AttendanceTotem(FluentWindow):
                 data = res.json()
                 if res.status_code == 200:
                     self.msg_box.setText(f"{data['status']}: {data['student_name']}")
-                    InfoBar.success(
-                        title="Rilevato",
-                        content=data['message'],
-                        orient=Qt.Orientation.Horizontal,
-                        isClosable=True,
-                        duration=3000,
-                        position=InfoBarPosition.TOP,
-                        parent=self
-                    )
+                    InfoBar.success(title="Rilevato", content=data['message'], orient=Qt.Orientation.Horizontal, 
+                                    isClosable=True, duration=3000, position=InfoBarPosition.TOP, parent=self)
                 else:
                     self.msg_box.setText("ACCESSO NEGATO")
-                    InfoBar.error(
-                        title="Errore",
-                        content=data['message'],
-                        orient=Qt.Orientation.Horizontal,
-                        isClosable=True,
-                        duration=3000,
-                        position=InfoBarPosition.TOP,
-                        parent=self
-                    )
+                    InfoBar.error(title="Errore", content=data['message'], orient=Qt.Orientation.Horizontal, 
+                                  isClosable=True, duration=3000, position=InfoBarPosition.TOP, parent=self)            
+            QTimer.singleShot(5000, self.set_camera_placeholder)
         except Exception:
-            InfoBar.warning(
-                title="Offline",
-                content="Server non raggiungibile",
-                orient=Qt.Orientation.Horizontal,
-                isClosable=True,
-                duration=3000,
-                position=InfoBarPosition.TOP,
-                parent=self
-            )
+            InfoBar.warning(title="Offline", content="Server non raggiungibile", orient=Qt.Orientation.Horizontal, 
+                            isClosable=True, duration=3000, position=InfoBarPosition.TOP, parent=self)
+            QTimer.singleShot(2000, self.set_camera_placeholder)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
