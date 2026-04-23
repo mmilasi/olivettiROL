@@ -18,7 +18,7 @@ MONGO_URI = os.getenv('MONGO_URI', 'mongodb://mongodb:27017/attendance_system')
 client = MongoClient(MONGO_URI)
 db = client.get_database()
 
-# --- DECORATOR PER PROTEGGERE LE ROTTE CHE RICHIEDONO AUTENTICAZIONE ---
+# --- DECORATOR PER PROTEGGERE LE ROTTE ---
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -31,7 +31,7 @@ def token_required(f):
         return f(current_user, *args, **kwargs)
     return decorated
 
-# --- CHIUSURA AUTOMATICA DELLA LEZIONE IN ORARIO DI FINE (sincronizzata con orario Docker) ---
+# --- CHIUSURA AUTOMATICA PER SCADENZA ORARIO ---
 def auto_check_expiry():
     now = datetime.datetime.now()
     today = now.strftime("%Y-%m-%d")
@@ -44,8 +44,7 @@ def auto_check_expiry():
             {"$set": {"exit_time": lesson['end_time'], "status": "Uscita Automatica"}}
         )
 
-# --- ROTTE API ---
-# --- AUTENTICAZIONE ---
+# --- ROTTE AUTENTICAZIONE ---
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
@@ -58,7 +57,16 @@ def login():
         return jsonify({'token': token}), 200
     return jsonify({'message': 'Credenziali errate'}), 401
 
-# --- GESTIONE LEZIONI E PRESENZE ---
+@app.route('/api/me', methods=['GET'])
+@token_required
+def get_me(current_user):
+    return jsonify({
+        "username": current_user['username'], 
+        "full_name": current_user.get('full_name'), 
+        "materia": current_user.get('materia')
+    }), 200
+
+# --- GESTIONE SESSIONE LEZIONE ---
 @app.route('/api/activate_lesson', methods=['POST'])
 @token_required
 def activate_lesson(current_user):
@@ -77,7 +85,22 @@ def activate_lesson(current_user):
     db.lessons.insert_one(lesson_data)
     return jsonify({"message": "Sessione avviata"}), 200
 
-# --- VERIFICA SESSIONE ATTIVA PER LA DASHBOARD E IL TOTEM ---
+@app.route('/api/deactivate_lesson', methods=['POST'])
+@token_required
+def deactivate_lesson(current_user):
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    current_time = datetime.datetime.now().strftime("%H:%M")
+    lesson = db.lessons.find_one({"teacher": current_user['username'], "is_active": True})
+    
+    if lesson:
+        db.lessons.update_one({"_id": lesson["_id"]}, {"$set": {"is_active": False}})
+        db.presenze.update_many(
+            {"date": today, "teacher": current_user['username'], "lesson": lesson['description'], "exit_time": None},
+            {"$set": {"exit_time": current_time, "status": "Chiusa da Docente"}}
+        )
+        return jsonify({"message": "Sessione terminata"}), 200
+    return jsonify({"message": "Nessuna sessione attiva"}), 404
+
 @app.route('/api/active_session', methods=['GET'])
 def get_active_session():
     auto_check_expiry()
@@ -94,36 +117,15 @@ def get_active_session():
         }), 200
     return jsonify({"active": False}), 200
 
-# --- REGISTRAZIONE PRESENZA (TOTEM) ---
+# --- PRESENZE E STORICO ---
 @app.route('/api/attendance/<teacher>/<lesson_desc>', methods=['GET'])
-def get_attendance_by_lesson(teacher, lesson_desc):
+def get_attendance(teacher, lesson_desc):
     today = datetime.datetime.now().strftime("%Y-%m-%d")
     presenze = list(db.presenze.find({
-        "date": today, 
-        "teacher": teacher, 
-        "lesson": lesson_desc
+        "date": today, "teacher": teacher, "lesson": lesson_desc
     }, {"_id": 0}).sort("entry_time", 1))
     return jsonify(presenze), 200
 
-# --- DISATTIVAZIONE MANUALE DELLA LEZIONE ---
-@app.route('/api/deactivate_lesson', methods=['POST'])
-@token_required
-def deactivate_lesson(current_user):
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
-    current_time = datetime.datetime.now().strftime("%H:%M")    
-    lesson = db.lessons.find_one({"teacher": current_user['username'], "is_active": True})
-    
-    if lesson:
-        db.lessons.update_one({"_id": lesson["_id"]}, {"$set": {"is_active": False}})
-        db.presenze.update_many(
-            {"date": today, "teacher": current_user['username'], "lesson": lesson['description'], "exit_time": None},
-            {"$set": {"exit_time": current_time, "status": "Terminata dal Docente"}}
-        )
-        return jsonify({"message": "Sessione terminata con successo"}), 200
-    
-    return jsonify({"message": "Nessuna sessione attiva trovata"}), 404
-
-# --- STORICO LEZIONI ---
 @app.route('/api/sessions_history', methods=['GET'])
 @token_required
 def get_history(current_user):
@@ -144,71 +146,39 @@ def export_pdf():
 
     pdf = FPDF()
     pdf.add_page()
-    
-    # --- SEZIONE GRAFICA PER IL PDF GENERATO ---
     pdf.set_fill_color(79, 70, 229)
     pdf.rect(0, 0, 210, 40, 'F')
-    pdf.set_font("Arial", 'B', 24)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_y(15)
+    pdf.set_font("Arial", 'B', 24); pdf.set_text_color(255, 255, 255); pdf.set_y(15)
     pdf.cell(190, 10, "ITS ATTENDANCE", ln=True, align='C')
-    pdf.set_font("Arial", '', 10)
-    pdf.cell(190, 10, f"REPORT GENERATO IL {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align='C')
-    pdf.ln(20)
-    pdf.set_text_color(31, 41, 55)
-    pdf.set_font("Arial", 'B', 14)
+    pdf.set_font("Arial", '', 10); pdf.cell(190, 10, f"REPORT GENERATO IL {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align='C')
+    pdf.ln(20); pdf.set_text_color(31, 41, 55); pdf.set_font("Arial", 'B', 14)
     pdf.cell(190, 10, f"Dettaglio Lezione: {lesson_desc}", ln=True)
-    pdf.set_draw_color(229, 231, 235)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(5)
-    pdf.set_font("Arial", 'B', 10)
-    pdf.set_text_color(107, 114, 128) 
-    pdf.cell(45, 8, "DOCENTE", 0)
-    pdf.cell(45, 8, "MATERIA", 0)
-    pdf.cell(45, 8, "ORARIO PREVISTO", 0)
-    pdf.cell(45, 8, "DATA", 0, 1)
-    pdf.set_font("Arial", 'B', 11)
-    pdf.set_text_color(31, 41, 55) 
-    pdf.cell(45, 8, user.get('full_name', teacher).upper(), 0)
-    pdf.cell(45, 8, lesson.get('subject', 'N.D.').upper(), 0)
-    pdf.cell(45, 8, f"{lesson.get('start_time')} - {lesson.get('end_time')}", 0)
+    pdf.set_draw_color(229, 231, 235); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(10)
+    pdf.set_font("Arial", 'B', 10); pdf.set_text_color(107, 114, 128)
+    pdf.cell(45, 8, "DOCENTE"); pdf.cell(45, 8, "MATERIA"); pdf.cell(45, 8, "ORARIO"); pdf.cell(45, 8, "DATA", 0, 1)
+    pdf.set_font("Arial", 'B', 11); pdf.set_text_color(31, 41, 55)
+    pdf.cell(45, 8, user.get('full_name', teacher).upper())
+    pdf.cell(45, 8, lesson.get('subject', 'N.D.').upper())
+    pdf.cell(45, 8, f"{lesson.get('start_time')} - {lesson.get('end_time')}")
     pdf.cell(45, 8, date, 0, 1)
     pdf.ln(15)
-    pdf.set_fill_color(248, 250, 252)
-    pdf.set_text_color(71, 85, 105)
-    pdf.set_draw_color(226, 232, 240)
-    pdf.set_font("Arial", 'B', 9)
+    pdf.set_fill_color(248, 250, 252); pdf.set_font("Arial", 'B', 9); pdf.set_text_color(71, 85, 105)
     pdf.cell(100, 12, "  NOMINATIVO STUDENTE", 1, 0, 'L', True)
-    pdf.cell(45, 12, "ORARIO ENTRATA", 1, 0, 'C', True)
-    pdf.cell(45, 12, "ORARIO USCITA", 1, 1, 'C', True)
-    pdf.set_font("Arial", '', 10)
-    pdf.set_text_color(31, 41, 55)
+    pdf.cell(45, 12, "ENTRATA", 1, 0, 'C', True)
+    pdf.cell(45, 12, "USCITA", 1, 1, 'C', True)
+    pdf.set_font("Arial", '', 10); pdf.set_text_color(31, 41, 55)
     fill = False
     for p in presenze:
-        if fill:
-            pdf.set_fill_color(252, 252, 253)
-        else:
-            pdf.set_fill_color(255, 255, 255)
+        pdf.set_fill_color(252, 252, 253) if fill else pdf.set_fill_color(255, 255, 255)
         pdf.cell(100, 10, f"  {p['student_name']}", 1, 0, 'L', True)
         pdf.cell(45, 10, p['entry_time'], 1, 0, 'C', True)
         pdf.cell(45, 10, p['exit_time'] or "---", 1, 1, 'C', True)
         fill = not fill
-    pdf.set_y(-20)
-    pdf.set_font("Arial", 'I', 8)
-    pdf.set_text_color(150)
-    pdf.cell(0, 10, f"Documento ufficiale ITS Attendance System - Pagina {pdf.page_no()}", 0, 0, 'C')
     output = io.BytesIO()
     pdf.output(output)
     output.seek(0)
     return send_file(output, mimetype='application/pdf', as_attachment=True, download_name=f"Report_{lesson_desc}.pdf")
 
-# --- ROTTE PER LA DASHBOARD ---
-@app.route('/api/me', methods=['GET'])
-@token_required
-def get_me(current_user):
-    return jsonify({"username": current_user['username'], "full_name": current_user.get('full_name'), "materia": current_user.get('materia')}), 200
-
-# --- ROTTA PER RENDERIZZARE LA DASHBOARD (FRONTEND) ---
 @app.route('/dashboard')
 def render_dashboard():
     return render_template('dashboard.html')

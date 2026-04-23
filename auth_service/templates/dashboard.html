@@ -8,18 +8,19 @@
 <body class="bg-slate-50 min-h-screen">
     
     <div id="login-section" class="flex items-center justify-center min-h-screen">
-        <div class="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md">
-            <h2 class="text-3xl font-black mb-8 text-indigo-800">Login Docente</h2>
-            <input type="text" id="user" placeholder="Username" class="w-full p-4 mb-4 bg-slate-100 rounded-2xl outline-none">
-            <input type="password" id="pass" placeholder="Password" class="w-full p-4 mb-8 bg-slate-100 rounded-2xl outline-none">
-            <button onclick="login()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg">Entra</button>
+        <div class="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md text-center">
+            <h1 class="text-4xl font-black text-indigo-600 mb-2 italic">ITS CLOUD</h1>
+            <h2 class="text-xl font-bold mb-8 text-slate-400 uppercase tracking-widest">Login Docente</h2>
+            <input type="text" id="user" placeholder="Username" class="w-full p-4 mb-4 bg-slate-100 rounded-2xl outline-none border focus:border-indigo-500 transition-all">
+            <input type="password" id="pass" placeholder="Password" class="w-full p-4 mb-8 bg-slate-100 rounded-2xl outline-none border focus:border-indigo-500 transition-all">
+            <button onclick="login()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-indigo-700 transition-all">ACCEDI</button>
         </div>
     </div>
 
     <div id="main-dashboard" class="hidden">
         <nav class="bg-white border-b p-6 flex justify-between items-center px-12 sticky top-0 z-50">
             <div>
-                <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tighter">ITS <span class="text-indigo-600">Cloud</span></h1>
+                <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tighter italic">ITS <span class="text-indigo-600">Cloud</span></h1>
                 <p id="nav-date" class="text-xs text-slate-400 font-bold italic"></p>
             </div>
             <div class="flex items-center gap-6">
@@ -29,31 +30,30 @@
         </nav>
 
         <div class="max-w-7xl mx-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
             <div class="lg:col-span-4 space-y-8">
                 <div id="active-session-card" class="hidden bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-xl">
-                    <div class="flex justify-between items-start">
-                        <span class="bg-indigo-400 text-[10px] font-black px-3 py-1 rounded-full uppercase">In Corso</span>
-                    </div>
+                    <span class="bg-indigo-400 text-[10px] font-black px-3 py-1 rounded-full uppercase">In Corso</span>
                     <h2 id="active-subject" class="text-3xl font-bold mt-4 leading-tight">---</h2>
                     <p id="active-materia-display" class="text-indigo-200 text-sm font-bold uppercase tracking-widest mt-1">---</p>
                     <p id="active-range" class="opacity-60 mb-8 font-mono mt-4">--:-- - --:--</p>
-                    <button onclick="terminateSession()" class="w-full bg-white text-indigo-600 py-4 rounded-2xl font-black hover:bg-rose-50 hover:text-rose-600 transition-colors">TERMINA ORA</button>
+                    <button onclick="terminateSession()" class="w-full bg-white text-indigo-600 py-4 rounded-2xl font-black hover:bg-rose-50 hover:text-rose-600 transition-all">TERMINA ORA</button>
                 </div>
 
                 <div id="new-session-form" class="bg-white p-8 rounded-[2.5rem] border shadow-sm">
-                    <h3 class="text-xl font-bold mb-6">Nuova Sessione</h3>
+                    <h3 class="text-xl font-bold mb-6 text-slate-800">Nuova Sessione</h3>
                     <div class="space-y-4">
-                        <input type="text" id="lesson_desc" placeholder="Descrizione lezione" class="w-full p-4 bg-slate-50 rounded-2xl outline-none">
+                        <input type="text" id="lesson_desc" placeholder="Argomento lezione" class="w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
                         <div class="grid grid-cols-2 gap-4">
-                            <input type="time" id="start_time" class="p-4 bg-slate-50 rounded-2xl">
-                            <input type="time" id="end_time" class="p-4 bg-slate-50 rounded-2xl">
+                            <input type="time" id="start_time" class="p-4 bg-slate-50 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <input type="time" id="end_time" class="p-4 bg-slate-50 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
-                        <button onclick="activateTotem()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-indigo-700 transition-colors">ATTIVA</button>
+                        <button onclick="activateTotem()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-indigo-700 transition-all">ATTIVA TOTEM</button>
                     </div>
                 </div>
 
                 <div class="bg-white p-8 rounded-[2.5rem] border shadow-sm">
-                    <h3 class="text-lg font-bold mb-6">Storico Lezioni Oggi</h3>
+                    <h3 class="text-lg font-bold mb-6 text-slate-800">Storico Odierno</h3>
                     <div id="history-list" class="space-y-3"></div>
                 </div>
             </div>
@@ -61,10 +61,10 @@
             <div class="lg:col-span-8 bg-white p-10 rounded-[3rem] border shadow-sm">
                 <div class="flex justify-between items-center mb-10">
                     <div>
-                        <h3 id="table-title" class="text-2xl font-black text-slate-800">Registro Live</h3>
-                        <p id="table-subtitle" class="text-sm text-slate-400">Presenze aggiornate in tempo reale</p>
+                        <h3 id="table-title" class="text-2xl font-black text-slate-800 tracking-tight">Registro Live</h3>
+                        <p id="table-subtitle" class="text-sm text-slate-400">Presenze sincronizzate con il Totem</p>
                     </div>
-                    <button id="pdf-btn" onclick="generatePDF()" class="hidden bg-slate-800 text-white px-6 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-black">Scarica PDF 📄</button>
+                    <button id="pdf-btn" onclick="generatePDF()" class="hidden bg-slate-800 text-white px-6 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-black transition-all">Report PDF 📄</button>
                 </div>
                 
                 <table class="w-full">
@@ -86,32 +86,26 @@
         let jwtToken = localStorage.getItem('token') || "";
         let currentView = { teacher: "", lesson: "", isLive: true };
         let currentUser = {};
-        document.getElementById('nav-date').innerText = new Date().toLocaleDateString('it-IT', { 
-            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
-        });
         if(jwtToken) showDashboard();
         function resetForm() {
             document.getElementById('lesson_desc').value = "";
             const now = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', hour12: false });
             document.getElementById('start_time').value = now;
             document.getElementById('end_time').value = "";
-            console.log("🧹 Form resettato");
         }
 
         async function login() {
-            const userVal = document.getElementById('user').value;
-            const passVal = document.getElementById('pass').value;
             const res = await fetch('/login', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username: userVal, password: passVal})
+                body: JSON.stringify({username: document.getElementById('user').value, password: document.getElementById('pass').value})
             });
             if(res.ok) {
                 const data = await res.json();
                 jwtToken = data.token;
                 localStorage.setItem('token', jwtToken);
                 showDashboard();
-            } else alert("Errore credenziali!");
+            } else alert("Credenziali errate!");
         }
 
         function logout() {
@@ -127,6 +121,7 @@
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('main-dashboard').classList.remove('hidden');
             document.getElementById('user-display').innerText = `👋 ${currentUser.full_name}`;
+            document.getElementById('nav-date').innerText = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
             
             resetForm();
             updateLoop();
@@ -148,8 +143,8 @@
             if(data.active) {
                 card.classList.remove('hidden');
                 form.classList.add('hidden');
-                document.getElementById('active-subject').innerText = data.description; // L'argomento (es. boni)
-                document.getElementById('active-materia-display').innerText = data.subject; // La materia (es. Sistemi e Reti)
+                document.getElementById('active-subject').innerText = data.description;
+                document.getElementById('active-materia-display').innerText = data.subject;
                 document.getElementById('active-range').innerText = data.range;
                 if(currentView.isLive) {
                     currentView.teacher = currentUser.username;
@@ -171,10 +166,10 @@
         function renderTable(data) {
             const list = document.getElementById('student-list');
             list.innerHTML = data.map(p => `
-                <tr class="text-sm hover:bg-slate-50 transition-colors">
+                <tr class="text-sm">
                     <td class="py-5 font-bold text-slate-700">${p.student_name}</td>
-                    <td class="text-center font-mono text-slate-400">${p.entry_time}</td>
-                    <td class="text-center font-mono text-slate-400">${p.exit_time || '--:--'}</td>
+                    <td class="text-center font-mono text-slate-400 text-xs">${p.entry_time}</td>
+                    <td class="text-center font-mono text-slate-400 text-xs">${p.exit_time || '--:--'}</td>
                     <td class="text-right">
                         <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase ${p.status.includes('Uscita') ? 'bg-slate-100 text-slate-400' : 'bg-green-100 text-green-700'}">
                             ${p.status}
@@ -183,6 +178,7 @@
                 </tr>
             `).join('');
             if(data.length > 0) document.getElementById('pdf-btn').classList.remove('hidden');
+            else document.getElementById('pdf-btn').classList.add('hidden');
         }
 
         async function fetchHistory() {
@@ -191,8 +187,8 @@
             const list = document.getElementById('history-list');
             list.innerHTML = data.map(s => `
                 <div onclick="viewPastSession('${s.teacher}', '${s.description}')" class="p-4 bg-white border rounded-2xl cursor-pointer hover:border-indigo-500 transition-all shadow-sm">
-                    <p class="text-[9px] font-black text-slate-400 uppercase">${s.start_time} - ${s.end_time}</p>
-                    <p class="font-bold text-slate-800 text-sm">${s.description}</p>
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-tighter">${s.start_time} - ${s.end_time}</p>
+                    <p class="font-bold text-slate-800 text-sm truncate">${s.description}</p>
                 </div>
             `).join('');
         }
@@ -200,7 +196,7 @@
         function viewPastSession(teacher, lesson) {
             currentView = { teacher, lesson, isLive: false };
             document.getElementById('table-title').innerText = "Dettaglio Lezione";
-            document.getElementById('table-subtitle').innerText = `Visualizzazione dati per: ${lesson}`;
+            document.getElementById('table-subtitle').innerText = `Archivio: ${lesson}`;
             fetchAttendance();
         }
 
@@ -214,35 +210,31 @@
                 start_time: document.getElementById('start_time').value,
                 end_time: document.getElementById('end_time').value
             };
-            
-            if(!payload.description || !payload.start_time || !payload.end_time) return alert("Dati mancanti!");
+            if(!payload.description || !payload.start_time || !payload.end_time) return alert("Compila tutti i campi!");
 
             const res = await fetch('/api/activate_lesson', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'x-access-token': jwtToken},
                 body: JSON.stringify(payload)
             });
-            
             if(res.ok) {
                 currentView.isLive = true;
                 resetForm();
-                updateLoop(); 
+                updateLoop();
             }
         }
 
         async function terminateSession() {
-            if(!confirm("Terminare la sessione attuale?")) return;
-            
+            if(!confirm("Confermi la chiusura della lezione?")) return;
             const res = await fetch('/api/deactivate_lesson', { 
                 method: 'POST', 
                 headers: {'x-access-token': jwtToken} 
             });
-
             if(res.ok) {
                 currentView.lesson = "";
                 resetForm();
                 updateLoop();
-                alert("Sessione chiusa correttamente.");
+                alert("Sessione terminata correttamente.");
             }
         }
     </script>

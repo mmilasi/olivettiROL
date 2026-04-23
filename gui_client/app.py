@@ -19,6 +19,7 @@ class AttendanceTotem(FluentWindow):
         self.hBoxLayout.setContentsMargins(0, 0, 0, 0)
         self._setup_ui()
         setTheme(Theme.LIGHT)
+        self.set_camera_placeholder()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.check_cloud_status)
         self.timer.start(3000)
@@ -43,7 +44,7 @@ class AttendanceTotem(FluentWindow):
         self.status_layout.addWidget(self.status_text)
         self.layout.addWidget(self.status_container)
 
-        # --- 2. RIGA 2: INFO COMPATTE ---
+        # --- 2. RIGA 2: INFO ---
         self.combined_info = SubtitleLabel("")
         self.combined_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.combined_info.setStyleSheet("color: #475569; font-weight: 500; font-size: 15px;")
@@ -51,7 +52,7 @@ class AttendanceTotem(FluentWindow):
         self.layout.addSpacing(10)
 
         # --- 3. AREA CAMERA ---
-        self.image_label = SubtitleLabel()
+        self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setMinimumHeight(400)
         self.layout.addWidget(self.image_label)
@@ -68,14 +69,11 @@ class AttendanceTotem(FluentWindow):
         self.btn_scan.setFixedHeight(60)
         self.btn_scan.clicked.connect(self.run_detection)
         self.layout.addWidget(self.btn_scan, 0, Qt.AlignmentFlag.AlignCenter)
-        self.set_camera_placeholder()
         self.addSubInterface(self.central_widget, FIF.HOME, 'Totem')
 
     def set_camera_placeholder(self):
-        """Ripristina la grafica di attesa con icona e testo formattato"""
         self.image_label.setPixmap(QPixmap())
         
-        # HTML per simulare òa grafica
         placeholder_html = """
             <div style='text-align: center;'>
                 <p style='font-size: 60px; margin-bottom: 20px;'>📷</p>
@@ -86,9 +84,11 @@ class AttendanceTotem(FluentWindow):
         self.image_label.setText(placeholder_html)
         
         self.image_label.setStyleSheet("""
-            border: 2px dashed #cbd5e1; 
-            border-radius: 28px; 
-            background: #f8fafc;
+            QLabel {
+                border: 2px dashed #cbd5e1; 
+                border-radius: 28px; 
+                background: #f8fafc;
+            }
         """)
         self.msg_box.setText("")
 
@@ -131,7 +131,7 @@ class AttendanceTotem(FluentWindow):
                 else:
                     self.msg_box.setText("ACCESSO NEGATO")
                     InfoBar.error(title="Errore", content=data['message'], orient=Qt.Orientation.Horizontal, 
-                                  isClosable=True, duration=3000, position=InfoBarPosition.TOP, parent=self)            
+                                  isClosable=True, duration=3000, position=InfoBarPosition.TOP, parent=self)
             QTimer.singleShot(5000, self.set_camera_placeholder)
         except Exception:
             InfoBar.warning(title="Offline", content="Server non raggiungibile", orient=Qt.Orientation.Horizontal, 
