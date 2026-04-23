@@ -2,7 +2,7 @@ import sys
 import os
 import requests
 from PyQt6.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QGraphicsOpacityEffect
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QPainter, QPainterPath, QBrush, QColor
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
 
 from qfluentwidgets import (FluentWindow, SubtitleLabel, PrimaryPushButton, 
@@ -74,6 +74,23 @@ class AttendanceTotem(FluentWindow):
 
         self.addSubInterface(self.central_widget, FIF.HOME, 'Totem')
 
+    def get_rounded_pixmap(self, pixmap, radius):
+        """Applica il clipping agli angoli della Pixmap per farla stare nei bordi arrotondati"""
+        target = QPixmap(pixmap.size())
+        target.fill(Qt.GlobalColor.transparent)
+        
+        painter = QPainter(target)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        
+        path = QPainterPath()
+        path.addRoundedRect(0, 0, pixmap.width(), pixmap.height(), radius, radius)
+        
+        painter.setClipPath(path)
+        painter.drawPixmap(0, 0, pixmap)
+        painter.end()
+        return target
+
     def set_camera_placeholder(self):
         self.image_label.setPixmap(QPixmap())
         placeholder_html = """
@@ -107,7 +124,6 @@ class AttendanceTotem(FluentWindow):
             self.status_text.setText("⚠️ OFFLINE")
 
     def show_animated_info(self, is_success, message):
-        """Gestisce la creazione, l'animazione e la rimozione dell'InfoBar"""
         if is_success:
             info = InfoBar.success(
                 title="Rilevato",
@@ -163,9 +179,11 @@ class AttendanceTotem(FluentWindow):
 
         path, _ = QFileDialog.getOpenFileName(self, "Camera", students_dir, "Images (*.jpg *.png)")
         if not path: return
-        self.image_label.setPixmap(QPixmap(path).scaled(self.image_label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        raw_pixmap = QPixmap(path).scaled(self.image_label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        rounded_pixmap = self.get_rounded_pixmap(raw_pixmap, 28)        
+        self.image_label.setPixmap(rounded_pixmap)
         self.image_label.setText("")
-        self.image_label.setStyleSheet("border: 2px solid #4f46e5; border-radius: 28px; background: #000;")
+        self.image_label.setStyleSheet("border: 2px dashed #cbd5e1; border-radius: 28px; background: #000;")
         self.msg_box.setText("")
 
         try:
@@ -173,6 +191,7 @@ class AttendanceTotem(FluentWindow):
                 res = requests.post(self.DETECT_URL, files={'image': f}, timeout=5)
                 data = res.json()
                 is_success = (res.status_code == 200)
+                duration = 5000 
                 QTimer.singleShot(1500, lambda: self.show_animated_info(is_success, data['message']))
 
         except Exception as e:

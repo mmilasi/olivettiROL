@@ -13,8 +13,7 @@ app = Flask(__name__)
 CORS(app)
 
 app.config['SECRET_KEY'] = os.getenv('JWT_SECRET', 'super_secret_its_2026')
-MONGO_URI = os.getenv('MONGO_URI', 'mongodb://mongodb:27017/attendance_system')
-
+MONGO_URI = os.getenv('MONGO_URI', 'mongodb://attendance_db:27017/attendance_system')
 client = MongoClient(MONGO_URI)
 db = client.get_database()
 

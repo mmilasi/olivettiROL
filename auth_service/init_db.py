@@ -3,7 +3,7 @@ from pymongo import MongoClient
 from werkzeug.security import generate_password_hash
 
 # Connessione globale
-client = MongoClient('mongodb://localhost:27017/')
+client = MongoClient('mongodb://attendance_db:27017/')
 db = client.get_database('attendance_system')
 
 def init_db():
@@ -43,7 +43,7 @@ def init_db():
         {"student_id": "S010", "name": "Giovanni Biancoli", "filename": "biancoli"},
         {"student_id": "S011", "name": "Jean-Marie Gnando", "filename": "gnando"},
         {"student_id": "S012", "name": "Davide Mineo", "filename": "mineo"},
-        {"student_id": "S013", "name": "Teodorina Lungu", "filename": "Lungu"},
+        {"student_id": "S013", "name": "Teodorina Lungu", "filename": "lungu"},
         {"student_id": "S014", "name": "Marija Milasinovic", "filename": "milasinovic"}
     ]
     db.students.insert_many(students)
