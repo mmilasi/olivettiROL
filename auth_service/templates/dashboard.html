@@ -29,13 +29,15 @@
         </nav>
 
         <div class="max-w-7xl mx-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
             <div class="lg:col-span-4 space-y-8">
                 <div id="active-session-card" class="hidden bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-xl">
-                    <span class="bg-indigo-400 text-[10px] font-black px-3 py-1 rounded-full uppercase">In Corso</span>
-                    <h2 id="active-subject" class="text-3xl font-bold mt-4">---</h2>
-                    <p id="active-range" class="opacity-60 mb-8 font-mono">--:-- - --:--</p>
-                    <button onclick="terminateSession()" class="w-full bg-white text-indigo-600 py-4 rounded-2xl font-black">TERMINA ORA</button>
+                    <div class="flex justify-between items-start">
+                        <span class="bg-indigo-400 text-[10px] font-black px-3 py-1 rounded-full uppercase">In Corso</span>
+                    </div>
+                    <h2 id="active-subject" class="text-3xl font-bold mt-4 leading-tight">---</h2>
+                    <p id="active-materia-display" class="text-indigo-200 text-sm font-bold uppercase tracking-widest mt-1">---</p>
+                    <p id="active-range" class="opacity-60 mb-8 font-mono mt-4">--:-- - --:--</p>
+                    <button onclick="terminateSession()" class="w-full bg-white text-indigo-600 py-4 rounded-2xl font-black hover:bg-rose-50 hover:text-rose-600 transition-colors">TERMINA ORA</button>
                 </div>
 
                 <div id="new-session-form" class="bg-white p-8 rounded-[2.5rem] border shadow-sm">
@@ -46,7 +48,7 @@
                             <input type="time" id="start_time" class="p-4 bg-slate-50 rounded-2xl">
                             <input type="time" id="end_time" class="p-4 bg-slate-50 rounded-2xl">
                         </div>
-                        <button onclick="activateTotem()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold">ATTIVA</button>
+                        <button onclick="activateTotem()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-indigo-700 transition-colors">ATTIVA</button>
                     </div>
                 </div>
 
@@ -84,21 +86,32 @@
         let jwtToken = localStorage.getItem('token') || "";
         let currentView = { teacher: "", lesson: "", isLive: true };
         let currentUser = {};
-
+        document.getElementById('nav-date').innerText = new Date().toLocaleDateString('it-IT', { 
+            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
+        });
         if(jwtToken) showDashboard();
+        function resetForm() {
+            document.getElementById('lesson_desc').value = "";
+            const now = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', hour12: false });
+            document.getElementById('start_time').value = now;
+            document.getElementById('end_time').value = "";
+            console.log("🧹 Form resettato");
+        }
 
         async function login() {
+            const userVal = document.getElementById('user').value;
+            const passVal = document.getElementById('pass').value;
             const res = await fetch('/login', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username: document.getElementById('user').value, password: document.getElementById('pass').value})
+                body: JSON.stringify({username: userVal, password: passVal})
             });
             if(res.ok) {
                 const data = await res.json();
                 jwtToken = data.token;
                 localStorage.setItem('token', jwtToken);
                 showDashboard();
-            } else alert("Errore!");
+            } else alert("Errore credenziali!");
         }
 
         function logout() {
@@ -108,11 +121,14 @@
 
         async function showDashboard() {
             const res = await fetch('/api/me', { headers: {'x-access-token': jwtToken} });
+            if(!res.ok) return logout();
             currentUser = await res.json();
+            
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('main-dashboard').classList.remove('hidden');
             document.getElementById('user-display').innerText = `👋 ${currentUser.full_name}`;
             
+            resetForm();
             updateLoop();
             setInterval(updateLoop, 3000);
         }
@@ -132,7 +148,8 @@
             if(data.active) {
                 card.classList.remove('hidden');
                 form.classList.add('hidden');
-                document.getElementById('active-subject').innerText = data.description;
+                document.getElementById('active-subject').innerText = data.description; // L'argomento (es. boni)
+                document.getElementById('active-materia-display').innerText = data.subject; // La materia (es. Sistemi e Reti)
                 document.getElementById('active-range').innerText = data.range;
                 if(currentView.isLive) {
                     currentView.teacher = currentUser.username;
@@ -154,18 +171,18 @@
         function renderTable(data) {
             const list = document.getElementById('student-list');
             list.innerHTML = data.map(p => `
-                <tr class="text-sm">
+                <tr class="text-sm hover:bg-slate-50 transition-colors">
                     <td class="py-5 font-bold text-slate-700">${p.student_name}</td>
                     <td class="text-center font-mono text-slate-400">${p.entry_time}</td>
                     <td class="text-center font-mono text-slate-400">${p.exit_time || '--:--'}</td>
                     <td class="text-right">
-                        <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase ${p.status === 'Presente' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}">
+                        <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase ${p.status.includes('Uscita') ? 'bg-slate-100 text-slate-400' : 'bg-green-100 text-green-700'}">
                             ${p.status}
                         </span>
                     </td>
                 </tr>
             `).join('');
-            document.getElementById('pdf-btn').classList.remove('hidden');
+            if(data.length > 0) document.getElementById('pdf-btn').classList.remove('hidden');
         }
 
         async function fetchHistory() {
@@ -173,7 +190,7 @@
             const data = await res.json();
             const list = document.getElementById('history-list');
             list.innerHTML = data.map(s => `
-                <div onclick="viewPastSession('${s.teacher}', '${s.description}')" class="p-4 bg-white border rounded-2xl cursor-pointer hover:border-indigo-500 transition-all">
+                <div onclick="viewPastSession('${s.teacher}', '${s.description}')" class="p-4 bg-white border rounded-2xl cursor-pointer hover:border-indigo-500 transition-all shadow-sm">
                     <p class="text-[9px] font-black text-slate-400 uppercase">${s.start_time} - ${s.end_time}</p>
                     <p class="font-bold text-slate-800 text-sm">${s.description}</p>
                 </div>
@@ -197,16 +214,36 @@
                 start_time: document.getElementById('start_time').value,
                 end_time: document.getElementById('end_time').value
             };
-            await fetch('/api/activate_lesson', {
+            
+            if(!payload.description || !payload.start_time || !payload.end_time) return alert("Dati mancanti!");
+
+            const res = await fetch('/api/activate_lesson', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'x-access-token': jwtToken},
                 body: JSON.stringify(payload)
             });
-            currentView.isLive = true;
+            
+            if(res.ok) {
+                currentView.isLive = true;
+                resetForm();
+                updateLoop(); 
+            }
         }
 
         async function terminateSession() {
-            await fetch('/api/deactivate_lesson', { method: 'POST', headers: {'x-access-token': jwtToken} });
+            if(!confirm("Terminare la sessione attuale?")) return;
+            
+            const res = await fetch('/api/deactivate_lesson', { 
+                method: 'POST', 
+                headers: {'x-access-token': jwtToken} 
+            });
+
+            if(res.ok) {
+                currentView.lesson = "";
+                resetForm();
+                updateLoop();
+                alert("Sessione chiusa correttamente.");
+            }
         }
     </script>
 </body>

@@ -88,7 +88,7 @@ def get_active_session():
         return jsonify({
             "active": True,
             "teacher_display": user.get('full_name'),
-            "subject": lesson['subject'],
+            "subject": lesson.get('subject', 'N.D.'),
             "description": lesson['description'],
             "range": f"{lesson['start_time']} - {lesson['end_time']}"
         }), 200
@@ -104,6 +104,24 @@ def get_attendance_by_lesson(teacher, lesson_desc):
         "lesson": lesson_desc
     }, {"_id": 0}).sort("entry_time", 1))
     return jsonify(presenze), 200
+
+# --- DISATTIVAZIONE MANUALE DELLA LEZIONE ---
+@app.route('/api/deactivate_lesson', methods=['POST'])
+@token_required
+def deactivate_lesson(current_user):
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    current_time = datetime.datetime.now().strftime("%H:%M")    
+    lesson = db.lessons.find_one({"teacher": current_user['username'], "is_active": True})
+    
+    if lesson:
+        db.lessons.update_one({"_id": lesson["_id"]}, {"$set": {"is_active": False}})
+        db.presenze.update_many(
+            {"date": today, "teacher": current_user['username'], "lesson": lesson['description'], "exit_time": None},
+            {"$set": {"exit_time": current_time, "status": "Terminata dal Docente"}}
+        )
+        return jsonify({"message": "Sessione terminata con successo"}), 200
+    
+    return jsonify({"message": "Nessuna sessione attiva trovata"}), 404
 
 # --- STORICO LEZIONI ---
 @app.route('/api/sessions_history', methods=['GET'])

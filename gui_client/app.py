@@ -27,8 +27,10 @@ class AttendanceTotem(FluentWindow):
         self.central_widget = QWidget()
         self.central_widget.setObjectName("totemInterface") 
         self.layout = QVBoxLayout(self.central_widget)
-        self.layout.setContentsMargins(50, 50, 50, 50)
-        self.layout.setSpacing(20)
+        self.layout.setContentsMargins(50, 40, 50, 40)
+        self.layout.setSpacing(10)
+
+        # --- 1. RIGA 1: STATO E DOCENTE ---
         self.status_container = QWidget()
         self.status_layout = QHBoxLayout(self.status_container)
         self.status_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -36,45 +38,45 @@ class AttendanceTotem(FluentWindow):
         self.status_dot.setFixedSize(12, 12)
         self.status_dot.setStyleSheet("background-color: #95a5a6; border-radius: 6px;")
         self.status_text = SubtitleLabel("CONNESSIONE IN CORSO...")
-        self.status_text.setStyleSheet("font-weight: bold; margin-left: 10px;")
+        self.status_text.setStyleSheet("font-weight: 800; font-size: 20px; margin-left: 10px;")
         self.status_layout.addWidget(self.status_dot)
         self.status_layout.addWidget(self.status_text)
         self.layout.addWidget(self.status_container)
 
-        # INFORMAZIONI LEZIONE
-        self.lesson_info = SubtitleLabel("")
-        self.lesson_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lesson_info.setStyleSheet("color: #7f8c8d; font-size: 16px;")
-        self.layout.addWidget(self.lesson_info)
+        # --- 2. RIGA 2: INFO COMPATTE  ---
+        self.combined_info = SubtitleLabel("")
+        self.combined_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.combined_info.setStyleSheet("color: #475569; font-weight: 500; font-size: 15px;")
+        self.layout.addWidget(self.combined_info)
+        self.layout.addSpacing(10)
 
-        # AREA CAMERA
+        # --- 3. AREA CAMERA ---
         self.image_label = SubtitleLabel("Inquadrare il volto")
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setMinimumHeight(400)
         self.image_label.setStyleSheet("""
             border: 2px solid #e2e8f0; 
-            border-radius: 20px; 
+            border-radius: 24px; 
             background: #f8fafc;
             color: #94a3b8;
         """)
         self.layout.addWidget(self.image_label)
 
-        # MESSAGGI
+        # --- 4. MESSAGGIO RISULTATO E PULSANTE ---
         self.msg_box = SubtitleLabel("")
         self.msg_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.msg_box.setStyleSheet("font-weight: 600; color: #1e293b;")
         self.layout.addWidget(self.msg_box)
         self.btn_container = QHBoxLayout()
         self.btn_container.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.btn_scan = PrimaryPushButton(FIF.PEOPLE, "Scansione")
-        self.btn_scan.setFixedWidth(280)
-        self.btn_scan.setFixedHeight(55)
+        self.btn_scan = PrimaryPushButton(FIF.PEOPLE, "Scansione Facciale")
+        self.btn_scan.setFixedWidth(300)
+        self.btn_scan.setFixedHeight(60)
         self.btn_scan.clicked.connect(self.run_detection)
         self.btn_container.addWidget(self.btn_scan)
         self.layout.addLayout(self.btn_container)
         self.addSubInterface(self.central_widget, FIF.HOME, 'Totem')
 
-    # --- FUNZIONI ---
-    # --- 1. CHECK CLOUD STATUS: CONTROLLO DELLA SESSIONE ATTIVA E AGGIORNAMENTO INTERFACCIA ---
     def check_cloud_status(self):
         try:
             res = requests.get(self.SESSION_URL, timeout=1.5)
@@ -82,19 +84,20 @@ class AttendanceTotem(FluentWindow):
                 data = res.json()
                 if data.get("active"):
                     self.status_dot.setStyleSheet("background-color: #2ecc71; border-radius: 6px;")
-                    self.status_text.setText(f"PRONTO - {data['teacher_display']}")
-                    self.lesson_info.setText(f"{data['subject']} ({data['range']})")
+                    self.status_text.setText(f"PRONTO - {data['teacher_display'].upper()}")
+                    info_text = f"{data['subject']} --- {data['description']} --- {data['range']}"
+                    self.combined_info.setText(info_text)
                     self.btn_scan.setEnabled(True)
                 else:
                     self.status_dot.setStyleSheet("background-color: #e74c3c; border-radius: 6px;")
                     self.status_text.setText("IN ATTESA DI ATTIVAZIONE...")
-                    self.lesson_info.setText("Sessione non attiva dalla Dashboard")
+                    self.combined_info.setText("Sessione non attiva dalla Dashboard")
                     self.btn_scan.setEnabled(False)
-        except:
+        except Exception:
             self.status_text.setText("⚠️ ERRORE CLOUD")
+            self.combined_info.setText("")
             self.status_dot.setStyleSheet("background-color: #95a5a6; border-radius: 6px;")
 
-    # --- 2. RUN DETECTION: SIMULAZIONE RILEVAMENTO CON IMMAGINE E GESTIONE RISPOSTA ---
     def run_detection(self):
         path, _ = QFileDialog.getOpenFileName(self, "Simula Camera", "", "Images (*.jpg *.png)")
         if not path: return
@@ -129,7 +132,7 @@ class AttendanceTotem(FluentWindow):
                         position=InfoBarPosition.TOP,
                         parent=self
                     )
-        except Exception as e:
+        except Exception:
             InfoBar.warning(
                 title="Offline",
                 content="Server non raggiungibile",
