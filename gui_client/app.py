@@ -1,172 +1,147 @@
 import sys
-import os
 import requests
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout,
-    QWidget, QFileDialog, QTextEdit, QCheckBox, QHBoxLayout,
-    QStatusBar, QMessageBox, QScrollArea, QLineEdit
-)
-from PyQt6.QtGui import QAction, QPixmap, QIcon, QTransform
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget, QLabel
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import Qt, QTimer
 
-class AttendanceClient(QMainWindow):
+from qfluentwidgets import (FluentWindow, SubtitleLabel, PrimaryPushButton, 
+                            InfoBar, InfoBarPosition, Theme, setTheme)
+from qfluentwidgets import FluentIcon as FIF
+
+class AttendanceTotem(FluentWindow):
     def __init__(self) -> None:
         super().__init__()
-        # docker mapping of microservices endpoints
-        self.AUTH_URL = "http://localhost:5001/login"
-        self.DETECT_URL = "http://localhost:5002/detect"
-        
-        self.setWindowTitle("ITS Attendance System - Terminale Totem")
-        self.setGeometry(100, 100, 500, 800)
-
-        self._init_state()
+        self.SESSION_URL = "http://127.0.0.1:5001/api/active_session"
+        self.DETECT_URL = "http://127.0.0.1:5002/detect"
+        self.setWindowTitle("ITS Totem - Terminale Presenze")
+        self.resize(600, 750) 
+        self.navigationInterface.hide() 
+        self.hBoxLayout.setContentsMargins(0, 0, 0, 0)
         self._setup_ui()
-        self.set_light_theme()
+        setTheme(Theme.LIGHT)
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.check_cloud_status)
+        self.timer.start(3000)
 
-    def _init_state(self) -> None:
-        """Inizializza lo stato dell'applicazione"""
-        self.current_image_path = None
-        self.auth_token = None
-        self.is_logged_in = False
-        self.current_theme = "light"
-
-    def _setup_ui(self) -> None:
-        """Costruisce l'interfaccia focalizzata sul business case"""
+    def _setup_ui(self):
         self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
-        self.root_layout = QVBoxLayout(self.central_widget)
+        self.central_widget.setObjectName("totemInterface") 
+        self.layout = QVBoxLayout(self.central_widget)
+        self.layout.setContentsMargins(50, 50, 50, 50)
+        self.layout.setSpacing(20)
+        self.status_container = QWidget()
+        self.status_layout = QHBoxLayout(self.status_container)
+        self.status_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_dot = QLabel()
+        self.status_dot.setFixedSize(12, 12)
+        self.status_dot.setStyleSheet("background-color: #95a5a6; border-radius: 6px;")
+        self.status_text = SubtitleLabel("CONNESSIONE IN CORSO...")
+        self.status_text.setStyleSheet("font-weight: bold; margin-left: 10px;")
+        self.status_layout.addWidget(self.status_dot)
+        self.status_layout.addWidget(self.status_text)
+        self.layout.addWidget(self.status_container)
 
-        menubar = self.menuBar()
-        if menubar is not None:
-            session_menu = menubar.addMenu("Sessione")
-            if session_menu is not None:
-                login_act = session_menu.addAction("Login Docente (JWT)")
-                if login_act is not None:
-                    login_act.triggered.connect(self.handle_login)
+        # INFORMAZIONI LEZIONE
+        self.lesson_info = SubtitleLabel("")
+        self.lesson_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lesson_info.setStyleSheet("color: #7f8c8d; font-size: 16px;")
+        self.layout.addWidget(self.lesson_info)
 
-            view_menu = menubar.addMenu("Aspetto")
-            if view_menu is not None:
-                light_act = view_menu.addAction("Tema Chiaro")
-                if light_act is not None:
-                    light_act.triggered.connect(self.set_light_theme)
-                
-                dark_act = view_menu.addAction("Tema Scuro")
-                if dark_act is not None:
-                    dark_act.triggered.connect(self.set_dark_theme)
-        
-        # display (camera feed simulation)
-        self.image_label = QLabel("Sistema in attesa.\nEffettuare il Login per attivare il sensore.")
+        # AREA CAMERA
+        self.image_label = SubtitleLabel("Inquadrare il volto")
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.image_label.setStyleSheet("border: 2px dashed #AAA; border-radius: 10px; background: #EEE; color: #555;")
         self.image_label.setMinimumHeight(400)
-        self.root_layout.addWidget(self.image_label)
+        self.image_label.setStyleSheet("""
+            border: 2px solid #e2e8f0; 
+            border-radius: 20px; 
+            background: #f8fafc;
+            color: #94a3b8;
+        """)
+        self.layout.addWidget(self.image_label)
 
-        # recognition info display box
-        self.result_box = QTextEdit()
-        self.result_box.setReadOnly(True)
-        self.result_box.setPlaceholderText("Risultati del riconoscimento AI...")
-        self.result_box.setFixedHeight(120)
-        self.root_layout.addWidget(self.result_box)
-
-        # control buttons
-        ctrl_layout = QHBoxLayout()
-        self.btn_load = QPushButton("Carica/Cattura Foto")
-        self.btn_load.setFixedHeight(50)
-        self.btn_load.clicked.connect(self.load_image)
-        
-        self.btn_scan = QPushButton("RILEVA PRESENZA")
-        self.btn_scan.setFixedHeight(50)
-        self.btn_scan.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
+        # MESSAGGI
+        self.msg_box = SubtitleLabel("")
+        self.msg_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.layout.addWidget(self.msg_box)
+        self.btn_container = QHBoxLayout()
+        self.btn_container.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.btn_scan = PrimaryPushButton(FIF.PEOPLE, "Scansione")
+        self.btn_scan.setFixedWidth(280)
+        self.btn_scan.setFixedHeight(55)
         self.btn_scan.clicked.connect(self.run_detection)
-        
-        ctrl_layout.addWidget(self.btn_load)
-        ctrl_layout.addWidget(self.btn_scan)
-        self.root_layout.addLayout(ctrl_layout)
+        self.btn_container.addWidget(self.btn_scan)
+        self.layout.addLayout(self.btn_container)
+        self.addSubInterface(self.central_widget, FIF.HOME, 'Totem')
 
-        # report options checkbox
-        self.check_report = QCheckBox("Registra automaticamente nel Database Presenze")
-        self.check_report.setChecked(True)
-        self.root_layout.addWidget(self.check_report)
-
-        # status bar
-        self.status_bar = QStatusBar()
-        self.setStatusBar(self.status_bar)
-
-    # --- microservices ---
-
-    def handle_login(self):
-        """Autenticazione JWT con input dinamico"""
-        from PyQt6.QtWidgets import QInputDialog
-        
-        username, ok1 = QInputDialog.getText(self, 'Login', 'Username:')
-        if not ok1 or not username: return
-
-        password, ok2 = QInputDialog.getText(self, 'Login', 'Password:', QLineEdit.EchoMode.Password)
-        if not ok2 or not password: return
-        
+    # --- FUNZIONI ---
+    # --- 1. CHECK CLOUD STATUS: CONTROLLO DELLA SESSIONE ATTIVA E AGGIORNAMENTO INTERFACCIA ---
+    def check_cloud_status(self):
         try:
-            credentials = {"username": username, "password": password}
-            response = requests.post(self.AUTH_URL, json=credentials)
-            
-            if response.status_code == 200:
-                self.auth_token = response.json().get('token')
-                self.is_logged_in = True
-                self.status_bar.showMessage(f"Sessione attiva: {username}")
-                self.image_label.setText("Sensore Attivo. Caricare foto studente.")
-                QMessageBox.information(self, "Login", "Autenticazione riuscita!")
-            else:
-                QMessageBox.warning(self, "Errore", "Credenziali non valide.")
-        except Exception as e:
-            QMessageBox.critical(self, "Errore", f"Connessione fallita: {e}")
-
-    def run_detection(self):
-        """Invia l'immagine al microservizio di rilevamento"""
-        if not self.is_logged_in:
-            QMessageBox.warning(self, "Accesso Negato", "Login richiesto.")
-            return
-        
-        if not self.current_image_path:
-            QMessageBox.warning(self, "Errore", "Caricare una foto prima.")
-            return
-
-        self.status_bar.showMessage("Analisi in corso...")
-        
-        try:
-            with open(self.current_image_path, 'rb') as img_file:
-                files = {'image': img_file}
-                headers = {'Authorization': f'Bearer {self.auth_token}'}
-                
-                response = requests.post(self.DETECT_URL, files=files, headers=headers)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    res_text = f"STUDENTE: {data.get('student_name')}\n"
-                    res_text += f"MATCH: {data.get('confidence')}%\n"
-                    res_text += f"ORARIO: {data.get('timestamp')}"
-                    self.result_box.setPlainText(res_text)
-                    self.status_bar.showMessage("Presenza registrata.")
+            res = requests.get(self.SESSION_URL, timeout=1.5)
+            if res.status_code == 200:
+                data = res.json()
+                if data.get("active"):
+                    self.status_dot.setStyleSheet("background-color: #2ecc71; border-radius: 6px;")
+                    self.status_text.setText(f"PRONTO - {data['teacher_display']}")
+                    self.lesson_info.setText(f"{data['subject']} ({data['range']})")
+                    self.btn_scan.setEnabled(True)
                 else:
-                    self.result_box.setPlainText("Errore rilevamento o sessione scaduta.")
+                    self.status_dot.setStyleSheet("background-color: #e74c3c; border-radius: 6px;")
+                    self.status_text.setText("IN ATTESA DI ATTIVAZIONE...")
+                    self.lesson_info.setText("Sessione non attiva dalla Dashboard")
+                    self.btn_scan.setEnabled(False)
+        except:
+            self.status_text.setText("⚠️ ERRORE CLOUD")
+            self.status_dot.setStyleSheet("background-color: #95a5a6; border-radius: 6px;")
+
+    # --- 2. RUN DETECTION: SIMULAZIONE RILEVAMENTO CON IMMAGINE E GESTIONE RISPOSTA ---
+    def run_detection(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Simula Camera", "", "Images (*.jpg *.png)")
+        if not path: return
+        
+        pixmap = QPixmap(path)
+        self.image_label.setPixmap(pixmap.scaled(self.image_label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        self.image_label.setText("")
+
+        try:
+            with open(path, 'rb') as f:
+                res = requests.post(self.DETECT_URL, files={'image': f}, timeout=5)
+                data = res.json()
+                if res.status_code == 200:
+                    self.msg_box.setText(f"{data['status']}: {data['student_name']}")
+                    InfoBar.success(
+                        title="Rilevato",
+                        content=data['message'],
+                        orient=Qt.Orientation.Horizontal,
+                        isClosable=True,
+                        duration=3000,
+                        position=InfoBarPosition.TOP,
+                        parent=self
+                    )
+                else:
+                    self.msg_box.setText("ACCESSO NEGATO")
+                    InfoBar.error(
+                        title="Errore",
+                        content=data['message'],
+                        orient=Qt.Orientation.Horizontal,
+                        isClosable=True,
+                        duration=3000,
+                        position=InfoBarPosition.TOP,
+                        parent=self
+                    )
         except Exception as e:
-            QMessageBox.critical(self, "Errore AI", str(e))
-
-    def load_image(self):
-        file, _ = QFileDialog.getOpenFileName(self, "Apri Foto", "", "Images (*.jpg *.png)")
-        if file:
-            self.current_image_path = file
-            pixmap = QPixmap(file)
-            scaled = pixmap.scaled(self.image_label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            self.image_label.setPixmap(scaled)
-            self.status_bar.showMessage(f"Caricato: {os.path.basename(file)}")
-
-    def set_light_theme(self):
-        self.setStyleSheet("QMainWindow { background-color: #F5F5F5; }")
-    
-    def set_dark_theme(self):
-        self.setStyleSheet("QMainWindow { background-color: #2D2D2D; color: white; }")
+            InfoBar.warning(
+                title="Offline",
+                content="Server non raggiungibile",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                duration=3000,
+                position=InfoBarPosition.TOP,
+                parent=self
+            )
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = AttendanceClient()
+    window = AttendanceTotem()
     window.show()
     sys.exit(app.exec())

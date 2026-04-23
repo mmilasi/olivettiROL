@@ -1,47 +1,55 @@
 import os
 import datetime
-import jwt
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from pymongo import MongoClient
 
 app = Flask(__name__)
-client = MongoClient(os.getenv('MONGO_URI'))
+CORS(app)
+
+# --- CONFIGURAZIONE MONGODB ---
+MONGO_URI = os.getenv('MONGO_URI', 'mongodb://mongodb:27017/attendance_system')
+client = MongoClient(MONGO_URI)
 db = client.get_database()
 
+# --- ENDPOINT DI RILEVAMENTO PRESENZA ---
 @app.route('/detect', methods=['POST'])
 def detect():
-    # token verification
-    auth_header = request.headers.get('Authorization')
-    
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return jsonify({'message': 'Token mancante o formato errato'}), 401
-    
-    token = auth_header.split(" ")[1]
+    now = datetime.datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    current_time = now.strftime("%H:%M")
+    timestamp = now.strftime("%H:%M:%S")
 
-    try:
-        user_info = jwt.decode(token, os.getenv('JWT_SECRET'), algorithms=["HS256"])
-    except jwt.ExpiredSignatureError:
-        return jsonify({'message': 'Token scaduto'}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({'message': 'Token non valido'}), 401
+    # 1. VERIFICA SESSIONE ATTIVA
+    lesson = db.lessons.find_one({"date": today, "is_active": True}, sort=[("_id", -1)])
+    if not lesson:
+        return jsonify({'message': 'SESSIONE TERMINATA: Il Totem è stato disattivato automaticamente'}), 403
 
-    # get image
+    # 2. IDENTIFICAZIONE STUDENTE
     file = request.files.get('image')
+    if not file: return jsonify({'message': 'Immagine mancante'}), 400
+    
+    filename_id = file.filename.split(".")[0].lower()
+    student = db.students.find_one({"filename": filename_id})
+    
+    if not student:
+        return jsonify({'message': f'STUDENTE NON RICONOSCIUTO: {filename_id} non in anagrafica'}), 404
 
-    if file and file.filename:
-        student_name = file.filename.split(".")[0]
+    student_name = student['name']
+
+    # 3. LOGICA TOGGLE PRESENZA (ENTRATA/USCITA)
+    active_presence = db.presenze.find_one({"student_name": student_name, "date": today, "exit_time": None})
+    
+    if active_presence:
+        db.presenze.update_one({"_id": active_presence["_id"]}, {"$set": {"exit_time": timestamp, "status": "Uscito"}})
+        return jsonify({"student_name": student_name, "status": "Uscita", "message": f"Uscita: {student_name}"}), 200
     else:
-        return jsonify({'message': 'Immagine mancante'}), 400
-
-    # log attendance
-    presenza = {
-        "studente": student_name,
-        "data": datetime.datetime.now(),
-        "docente_che_ha_scansionato": user_info['username']
-    }
-    db.presenze.insert_one(presenza)
-
-    return jsonify({"message": f"Presenza registrata per {student_name}"}), 200
+        db.presenze.insert_one({
+            "student_name": student_name, "date": today, "entry_time": timestamp, 
+            "exit_time": None, "status": "Presente", 
+            "teacher": lesson['teacher'], "lesson": lesson['description']
+        })
+        return jsonify({"student_name": student_name, "status": "Entrata", "message": f"Ingresso: {student_name}"}), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

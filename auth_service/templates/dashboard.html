@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>ITS Dashboard - Gestione</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    
+    #### SEZIONE LOGIN ###
+    <div id="login-section" class="flex items-center justify-center min-h-screen">
+        <div class="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md">
+            <h2 class="text-3xl font-black mb-8 text-indigo-800">Login Docente</h2>
+            <input type="text" id="user" placeholder="Username" class="w-full p-4 mb-4 bg-slate-100 rounded-2xl outline-none">
+            <input type="password" id="pass" placeholder="Password" class="w-full p-4 mb-8 bg-slate-100 rounded-2xl outline-none">
+            <button onclick="login()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg">Entra</button>
+        </div>
+    </div>
+
+    #### SEZIONE DASHBOARD ###
+    <div id="main-dashboard" class="hidden">
+        <nav class="bg-white border-b p-6 flex justify-between items-center px-12 sticky top-0 z-50">
+            <div>
+                <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tighter">ITS <span class="text-indigo-600">Cloud</span></h1>
+                <p id="nav-date" class="text-xs text-slate-400 font-bold italic"></p>
+            </div>
+            <div class="flex items-center gap-6">
+                <div id="user-display" class="font-bold text-slate-700"></div>
+                <button onclick="logout()" class="text-rose-500 font-black text-xs uppercase hover:underline">Logout 🚪</button>
+            </div>
+        </nav>
+
+        <div class="max-w-7xl mx-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <div class="lg:col-span-4 space-y-8">
+                <div id="active-session-card" class="hidden bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-xl">
+                    <span class="bg-indigo-400 text-[10px] font-black px-3 py-1 rounded-full uppercase">In Corso</span>
+                    <h2 id="active-subject" class="text-3xl font-bold mt-4">---</h2>
+                    <p id="active-range" class="opacity-60 mb-8 font-mono">--:-- - --:--</p>
+                    <button onclick="terminateSession()" class="w-full bg-white text-indigo-600 py-4 rounded-2xl font-black">TERMINA ORA</button>
+                </div>
+
+                <div id="new-session-form" class="bg-white p-8 rounded-[2.5rem] border shadow-sm">
+                    <h3 class="text-xl font-bold mb-6">Nuova Sessione</h3>
+                    <div class="space-y-4">
+                        <input type="text" id="lesson_desc" placeholder="Descrizione lezione" class="w-full p-4 bg-slate-50 rounded-2xl outline-none">
+                        <div class="grid grid-cols-2 gap-4">
+                            <input type="time" id="start_time" class="p-4 bg-slate-50 rounded-2xl">
+                            <input type="time" id="end_time" class="p-4 bg-slate-50 rounded-2xl">
+                        </div>
+                        <button onclick="activateTotem()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold">ATTIVA</button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-8 rounded-[2.5rem] border shadow-sm">
+                    <h3 class="text-lg font-bold mb-6">Storico Lezioni Oggi</h3>
+                    <div id="history-list" class="space-y-3"></div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-8 bg-white p-10 rounded-[3rem] border shadow-sm">
+                <div class="flex justify-between items-center mb-10">
+                    <div>
+                        <h3 id="table-title" class="text-2xl font-black text-slate-800">Registro Live</h3>
+                        <p id="table-subtitle" class="text-sm text-slate-400">Presenze aggiornate in tempo reale</p>
+                    </div>
+                    <button id="pdf-btn" onclick="generatePDF()" class="hidden bg-slate-800 text-white px-6 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-black">Scarica PDF 📄</button>
+                </div>
+                
+                <table class="w-full">
+                    <thead>
+                        <tr class="text-slate-400 text-[10px] font-black uppercase tracking-widest border-b">
+                            <th class="pb-6 text-left">Studente</th>
+                            <th class="pb-6 text-center">Entrata</th>
+                            <th class="pb-6 text-center">Uscita</th>
+                            <th class="pb-6 text-right">Stato</th>
+                        </tr>
+                    </thead>
+                    <tbody id="student-list" class="divide-y divide-slate-50"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    #### SCRIPT ###
+    <script>
+        let jwtToken = localStorage.getItem('token') || "";
+        let currentView = { teacher: "", lesson: "", isLive: true };
+        let currentUser = {};
+
+        if(jwtToken) showDashboard();
+
+        async function login() {
+            const res = await fetch('/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: document.getElementById('user').value, password: document.getElementById('pass').value})
+            });
+            if(res.ok) {
+                const data = await res.json();
+                jwtToken = data.token;
+                localStorage.setItem('token', jwtToken);
+                showDashboard();
+            } else alert("Errore!");
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            location.reload();
+        }
+
+        async function showDashboard() {
+            const res = await fetch('/api/me', { headers: {'x-access-token': jwtToken} });
+            currentUser = await res.json();
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('main-dashboard').classList.remove('hidden');
+            document.getElementById('user-display').innerText = `👋 ${currentUser.full_name}`;
+            
+            updateLoop();
+            setInterval(updateLoop, 3000);
+        }
+
+        function updateLoop() {
+            checkActiveSession();
+            fetchHistory();
+            if(currentView.isLive) fetchAttendance();
+        }
+
+        async function checkActiveSession() {
+            const res = await fetch('/api/active_session');
+            const data = await res.json();
+            const card = document.getElementById('active-session-card');
+            const form = document.getElementById('new-session-form');
+
+            if(data.active) {
+                card.classList.remove('hidden');
+                form.classList.add('hidden');
+                document.getElementById('active-subject').innerText = data.description;
+                document.getElementById('active-range').innerText = data.range;
+                if(currentView.isLive) {
+                    currentView.teacher = currentUser.username;
+                    currentView.lesson = data.description;
+                }
+            } else {
+                card.classList.add('hidden');
+                form.classList.remove('hidden');
+            }
+        }
+
+        async function fetchAttendance() {
+            if(!currentView.lesson) return;
+            const res = await fetch(`/api/attendance/${currentView.teacher}/${currentView.lesson}`);
+            const data = await res.json();
+            renderTable(data);
+        }
+
+        function renderTable(data) {
+            const list = document.getElementById('student-list');
+            list.innerHTML = data.map(p => `
+                <tr class="text-sm">
+                    <td class="py-5 font-bold text-slate-700">${p.student_name}</td>
+                    <td class="text-center font-mono text-slate-400">${p.entry_time}</td>
+                    <td class="text-center font-mono text-slate-400">${p.exit_time || '--:--'}</td>
+                    <td class="text-right">
+                        <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase ${p.status === 'Presente' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}">
+                            ${p.status}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+            document.getElementById('pdf-btn').classList.remove('hidden');
+        }
+
+        async function fetchHistory() {
+            const res = await fetch('/api/sessions_history', { headers: {'x-access-token': jwtToken} });
+            const data = await res.json();
+            const list = document.getElementById('history-list');
+            list.innerHTML = data.map(s => `
+                <div onclick="viewPastSession('${s.teacher}', '${s.description}')" class="p-4 bg-white border rounded-2xl cursor-pointer hover:border-indigo-500 transition-all">
+                    <p class="text-[9px] font-black text-slate-400 uppercase">${s.start_time} - ${s.end_time}</p>
+                    <p class="font-bold text-slate-800 text-sm">${s.description}</p>
+                </div>
+            `).join('');
+        }
+
+        function viewPastSession(teacher, lesson) {
+            currentView = { teacher, lesson, isLive: false };
+            document.getElementById('table-title').innerText = "Dettaglio Lezione";
+            document.getElementById('table-subtitle').innerText = `Visualizzazione dati per: ${lesson}`;
+            fetchAttendance();
+        }
+
+        function generatePDF() {
+            window.open(`/api/export_pdf?teacher=${currentView.teacher}&lesson=${currentView.lesson}`, '_blank');
+        }
+
+        async function activateTotem() {
+            const payload = {
+                description: document.getElementById('lesson_desc').value,
+                start_time: document.getElementById('start_time').value,
+                end_time: document.getElementById('end_time').value
+            };
+            await fetch('/api/activate_lesson', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'x-access-token': jwtToken},
+                body: JSON.stringify(payload)
+            });
+            currentView.isLive = true;
+        }
+
+        async function terminateSession() {
+            await fetch('/api/deactivate_lesson', { method: 'POST', headers: {'x-access-token': jwtToken} });
+        }
+    </script>
+</body>
+</html>
