@@ -85,6 +85,7 @@ def activate_lesson(current_user):
     db.lessons.insert_one(lesson_data)
     return jsonify({"message": "Sessione avviata"}), 200
 
+# --- CHIUSURA SESSIONE LEZIONE ---
 @app.route('/api/deactivate_lesson', methods=['POST'])
 @token_required
 def deactivate_lesson(current_user):
@@ -101,6 +102,7 @@ def deactivate_lesson(current_user):
         return jsonify({"message": "Sessione terminata"}), 200
     return jsonify({"message": "Nessuna sessione attiva"}), 404
 
+# --- STATO SESSIONE ATTIVA ---
 @app.route('/api/active_session', methods=['GET'])
 def get_active_session():
     auto_check_expiry()
@@ -126,6 +128,7 @@ def get_attendance(teacher, lesson_desc):
     }, {"_id": 0}).sort("entry_time", 1))
     return jsonify(presenze), 200
 
+# --- STORICO LEZIONI ---
 @app.route('/api/sessions_history', methods=['GET'])
 @token_required
 def get_history(current_user):
@@ -183,5 +186,17 @@ def export_pdf():
 def render_dashboard():
     return render_template('dashboard.html')
 
+# --- AVVIO SERVER CON CONTROLLO DI ESISTENZA DI DATABASE ---
 if __name__ == '__main__':
+    with app.app_context():
+            try:
+                if db.users.count_documents({}) == 0:
+                    print("🆕 Database vuoto rilevato! Lancio popolamento iniziale...")
+                    from init_db import init_db
+                    init_db()
+                    print("✅ Database popolato con successo.")
+                else:
+                    print("✨ Database già esistente, salto inizializzazione.")
+            except Exception as e:
+                print(f"⚠️ Errore durante l'inizializzazione DB: {e}")
     app.run(host='0.0.0.0', port=5000, debug=True)

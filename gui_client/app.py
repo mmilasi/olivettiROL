@@ -1,4 +1,5 @@
 import sys
+import os
 import requests
 from PyQt6.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget, QLabel
 from PyQt6.QtGui import QPixmap
@@ -19,7 +20,7 @@ class AttendanceTotem(FluentWindow):
         self.hBoxLayout.setContentsMargins(0, 0, 0, 0)
         self._setup_ui()
         setTheme(Theme.LIGHT)
-        self.set_camera_placeholder()
+        self.set_camera_placeholder()   
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.check_cloud_status)
         self.timer.start(3000)
@@ -73,7 +74,6 @@ class AttendanceTotem(FluentWindow):
 
     def set_camera_placeholder(self):
         self.image_label.setPixmap(QPixmap())
-        
         placeholder_html = """
             <div style='text-align: center;'>
                 <p style='font-size: 60px; margin-bottom: 20px;'>📷</p>
@@ -82,14 +82,7 @@ class AttendanceTotem(FluentWindow):
             </div>
         """
         self.image_label.setText(placeholder_html)
-        
-        self.image_label.setStyleSheet("""
-            QLabel {
-                border: 2px dashed #cbd5e1; 
-                border-radius: 28px; 
-                background: #f8fafc;
-            }
-        """)
+        self.image_label.setStyleSheet("border: 2px dashed #cbd5e1; border-radius: 28px; background: #f8fafc;")
         self.msg_box.setText("")
 
     def check_cloud_status(self):
@@ -109,10 +102,20 @@ class AttendanceTotem(FluentWindow):
                     self.btn_scan.setEnabled(False)
         except Exception:
             self.status_text.setText("⚠️ ERRORE CLOUD")
-            self.status_dot.setStyleSheet("background-color: #95a5a6; border-radius: 6px;")
 
     def run_detection(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Simula Camera", "", "Images (*.jpg *.png)")
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        students_dir = os.path.join(project_root, "img_students")
+        if not os.path.exists(students_dir):
+            students_dir = current_dir
+
+        path, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Scansione Facciale - Seleziona Studente", 
+            students_dir, 
+            "Images (*.jpg *.png)"
+        )
         if not path: return
         
         pixmap = QPixmap(path)
@@ -126,16 +129,13 @@ class AttendanceTotem(FluentWindow):
                 data = res.json()
                 if res.status_code == 200:
                     self.msg_box.setText(f"{data['status']}: {data['student_name']}")
-                    InfoBar.success(title="Rilevato", content=data['message'], orient=Qt.Orientation.Horizontal, 
-                                    isClosable=True, duration=3000, position=InfoBarPosition.TOP, parent=self)
+                    InfoBar.success(title="Successo", content=data['message'], parent=self)
                 else:
                     self.msg_box.setText("ACCESSO NEGATO")
-                    InfoBar.error(title="Errore", content=data['message'], orient=Qt.Orientation.Horizontal, 
-                                  isClosable=True, duration=3000, position=InfoBarPosition.TOP, parent=self)
+                    InfoBar.error(title="Errore", content=data['message'], parent=self)
             QTimer.singleShot(5000, self.set_camera_placeholder)
         except Exception:
-            InfoBar.warning(title="Offline", content="Server non raggiungibile", orient=Qt.Orientation.Horizontal, 
-                            isClosable=True, duration=3000, position=InfoBarPosition.TOP, parent=self)
+            InfoBar.warning(title="Offline", content="Server non raggiungibile", parent=self)
             QTimer.singleShot(2000, self.set_camera_placeholder)
 
 if __name__ == "__main__":
