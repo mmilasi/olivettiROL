@@ -7,7 +7,6 @@
 </head>
 <body class="bg-slate-50 min-h-screen">
     
-    #### SEZIONE LOGIN ###
     <div id="login-section" class="flex items-center justify-center min-h-screen">
         <div class="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md">
             <h2 class="text-3xl font-black mb-8 text-indigo-800">Login Docente</h2>
@@ -17,7 +16,6 @@
         </div>
     </div>
 
-    #### SEZIONE DASHBOARD ###
     <div id="main-dashboard" class="hidden">
         <nav class="bg-white border-b p-6 flex justify-between items-center px-12 sticky top-0 z-50">
             <div>
@@ -82,7 +80,6 @@
         </div>
     </div>
 
-    #### SCRIPT ###
     <script>
         let jwtToken = localStorage.getItem('token') || "";
         let currentView = { teacher: "", lesson: "", isLive: true };
