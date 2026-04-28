@@ -8,6 +8,7 @@ from werkzeug.security import check_password_hash
 from functools import wraps
 from fpdf import FPDF
 import io
+from bson import ObjectId
 
 app = Flask(__name__)
 CORS(app)
@@ -73,6 +74,7 @@ def activate_lesson(current_user):
     db.lessons.update_many({"is_active": True}, {"$set": {"is_active": False}})
     lesson_data = {
         "description": data.get('description'),
+        "corso": data.get('corso'),
         "start_time": data.get('start_time'),
         "end_time": data.get('end_time'),
         "teacher": current_user['username'],
@@ -121,9 +123,10 @@ def get_active_session():
 # --- PRESENZE E STORICO ---
 @app.route('/api/attendance/<teacher>/<lesson_desc>', methods=['GET'])
 def get_attendance(teacher, lesson_desc):
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    lesson = db.lessons.find_one({"teacher": teacher, "description": lesson_desc})
+    if not lesson: return jsonify([]), 200
     presenze = list(db.presenze.find({
-        "date": today, "teacher": teacher, "lesson": lesson_desc
+        "date": lesson['date'], "teacher": teacher, "lesson": lesson_desc
     }, {"_id": 0}).sort("entry_time", 1))
     return jsonify(presenze), 200
 
@@ -131,56 +134,115 @@ def get_attendance(teacher, lesson_desc):
 @app.route('/api/sessions_history', methods=['GET'])
 @token_required
 def get_history(current_user):
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
-    history = list(db.lessons.find({"date": today}, {"_id": 0}).sort("timestamp", -1))
+    history = list(db.lessons.find({"teacher": current_user['username']}, {"_id": 0}).sort("timestamp", -1))
     return jsonify(history), 200
 
 # --- ESPORTAZIONE PDF ---
 @app.route('/api/export_pdf', methods=['GET'])
 def export_pdf():
-    teacher = request.args.get('teacher')
+    teacher_username = request.args.get('teacher')
     lesson_desc = request.args.get('lesson')
-    date = datetime.datetime.now().strftime("%Y-%m-%d")
-    
-    lesson = db.lessons.find_one({"date": date, "teacher": teacher, "description": lesson_desc})
-    user = db.users.find_one({"username": teacher})
-    presenze = list(db.presenze.find({"date": date, "teacher": teacher, "lesson": lesson_desc}).sort("entry_time", 1))
+    filtro_stato = request.args.get('stato')      
+    filtro_fuori = request.args.get('fuorisede')   
+    include_ritirati = request.args.get('ritirati') == 'true' or request.args.get('ritirati') is None
+    lesson = db.lessons.find_one({"teacher": teacher_username, "description": lesson_desc})
+    if not lesson: 
+        return "Lezione non trovata", 404
+    teacher_data = db.users.find_one({"username": teacher_username})
+    full_teacher_name = teacher_data.get('full_name', teacher_username)
+    subject = lesson.get('subject', 'N.D.')
+    corso_target = lesson.get('corso')
+    date_lezione = lesson.get('date')
+    query_studenti = {"metadata.corso": corso_target}
+    if not include_ritirati:
+        query_studenti["metadata.stato"] = "attivo"
+    studenti_corso = list(db.users.find(query_studenti))
+    presenze_registrate = db.presenze.distinct("username", {
+        "date": date_lezione, "teacher": teacher_username, "lesson": lesson_desc
+    })
 
+    lista_finale = []
+    for s in studenti_corso:
+        is_presente = s['username'] in presenze_registrate
+        meta = s.get('metadata', {})      
+        include = True
+        if filtro_stato == 'presenti' and not is_presente: include = False
+        if filtro_stato == 'assenti' and is_presente: include = False
+        if filtro_fuori and meta.get('fuorisede') != filtro_fuori: include = False
+        if include:
+            dettaglio = db.presenze.find_one({
+                "username": s['username'], "lesson": lesson_desc, "date": date_lezione
+            })
+            lista_finale.append({
+                "nome": f"{s.get('nome','')} {s.get('cognome','')}".upper(),
+                "stato": "PRESENTE" if is_presente else "ASSENTE",
+                "entrata": dettaglio['entry_time'] if is_presente else "--:--",
+                "uscita": (dettaglio.get('exit_time') or "--:--") if is_presente and dettaglio else "--:--",
+                "fuorisede": meta.get('fuorisede', 'N.D.').upper(),
+                "condizione": meta.get('stato', 'attivo').upper()
+            })
+
+    # --- GENERAZIONE PDF ---
     pdf = FPDF()
     pdf.add_page()
     pdf.set_fill_color(79, 70, 229)
-    pdf.rect(0, 0, 210, 40, 'F')
-    pdf.set_font("Arial", 'B', 24); pdf.set_text_color(255, 255, 255); pdf.set_y(15)
-    pdf.cell(190, 10, "ITS ATTENDANCE", ln=True, align='C')
-    pdf.set_font("Arial", '', 10); pdf.cell(190, 10, f"REPORT GENERATO IL {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align='C')
-    pdf.ln(20); pdf.set_text_color(31, 41, 55); pdf.set_font("Arial", 'B', 14)
-    pdf.cell(190, 10, f"Dettaglio Lezione: {lesson_desc}", ln=True)
-    pdf.set_draw_color(229, 231, 235); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(10)
-    pdf.set_font("Arial", 'B', 10); pdf.set_text_color(107, 114, 128)
-    pdf.cell(45, 8, "DOCENTE"); pdf.cell(45, 8, "MATERIA"); pdf.cell(45, 8, "ORARIO"); pdf.cell(45, 8, "DATA", 0, 1)
-    pdf.set_font("Arial", 'B', 11); pdf.set_text_color(31, 41, 55)
-    pdf.cell(45, 8, user.get('full_name', teacher).upper())
-    pdf.cell(45, 8, lesson.get('subject', 'N.D.').upper())
-    pdf.cell(45, 8, f"{lesson.get('start_time')} - {lesson.get('end_time')}")
-    pdf.cell(45, 8, date, 0, 1)
-    pdf.ln(15)
-    pdf.set_fill_color(248, 250, 252); pdf.set_font("Arial", 'B', 9); pdf.set_text_color(71, 85, 105)
-    pdf.cell(100, 12, "  NOMINATIVO STUDENTE", 1, 0, 'L', True)
-    pdf.cell(45, 12, "ENTRATA", 1, 0, 'C', True)
-    pdf.cell(45, 12, "USCITA", 1, 1, 'C', True)
-    pdf.set_font("Arial", '', 10); pdf.set_text_color(31, 41, 55)
-    fill = False
-    for p in presenze:
-        pdf.set_fill_color(252, 252, 253) if fill else pdf.set_fill_color(255, 255, 255)
-        pdf.cell(100, 10, f"  {p['student_name']}", 1, 0, 'L', True)
-        pdf.cell(45, 10, p['entry_time'], 1, 0, 'C', True)
-        pdf.cell(45, 10, p['exit_time'] or "---", 1, 1, 'C', True)
-        fill = not fill
+    pdf.rect(0, 0, 210, 50, 'F')
+    pdf.set_font("Arial", 'B', 18)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_y(15)
+    pdf.cell(190, 10, "ROL - Registro OffLine - ITS Academy Olivetti", ln=True, align='C')
+    pdf.set_font("Arial", '', 9)
+    pdf.set_text_color(200, 200, 200)
+    pdf.cell(190, 5, f"CORSO: {corso_target} | FILTRI ATTIVI: {filtro_stato or 'TUTTI'}", ln=True, align='C')
+    pdf.set_y(60)
+    pdf.set_text_color(71, 85, 105)
+    pdf.set_font("Arial", 'B', 8)
+    pdf.cell(63, 5, "DOCENTE", 0, 0, 'L')
+    pdf.cell(63, 5, "MATERIA", 0, 0, 'L')
+    pdf.cell(63, 5, "DATA LEZIONE", 0, 1, 'R')
+    pdf.set_text_color(30, 41, 59)
+    pdf.set_font("Arial", 'B', 11)
+    pdf.cell(63, 8, full_teacher_name.upper(), 0, 0, 'L')
+    pdf.cell(63, 8, subject.upper(), 0, 0, 'L')
+    pdf.cell(63, 8, date_lezione, 0, 1, 'R')
+    pdf.ln(2)
+    pdf.set_font("Arial", 'B', 14)
+    pdf.cell(190, 10, f"Lezione: {lesson_desc}", ln=True)    
+    pdf.ln(5)
+    pdf.set_fill_color(241, 245, 249)
+    pdf.set_draw_color(226, 232, 240)
+    pdf.set_font("Arial", 'B', 8)
+    pdf.set_text_color(100, 116, 139)    
+    pdf.cell(70, 10, " NOMINATIVO STUDENTE", 1, 0, 'L', True)
+    pdf.cell(25, 10, "STATO", 1, 0, 'C', True)
+    pdf.cell(25, 10, "ENTRATA", 1, 0, 'C', True)
+    pdf.cell(25, 10, "USCITA", 1, 0, 'C', True)
+    pdf.cell(25, 10, "F. SEDE", 1, 0, 'C', True)
+    pdf.cell(20, 10, "NOTE", 1, 1, 'C', True)
+    pdf.set_font("Arial", '', 9)
+    for row in lista_finale:
+        if row['stato'] == "ASSENTE":
+            pdf.set_fill_color(254, 242, 242)
+            pdf.set_fill_color(255, 255, 255)
+        pdf.set_text_color(30, 41, 59)
+        pdf.cell(70, 10, f" {row['nome']}", 1, 0, 'L', True)
+        if row['stato'] == "ASSENTE":
+            pdf.set_text_color(220, 38, 38)
+        else:
+            pdf.set_text_color(22, 163, 74)
+        pdf.cell(25, 10, row['stato'], 1, 0, 'C', True)
+        pdf.set_text_color(71, 85, 105)
+        pdf.cell(25, 10, row['entrata'], 1, 0, 'C', True)
+        pdf.cell(25, 10, row['uscita'], 1, 0, 'C', True)
+        pdf.cell(25, 10, row['fuorisede'], 1, 0, 'C', True)        
+        note = "RIT." if row['condizione'] == "RITIRATO" else ""
+        pdf.cell(20, 10, note, 1, 1, 'C', True)
+
     output = io.BytesIO()
     pdf.output(output)
     output.seek(0)
-    return send_file(output, mimetype='application/pdf', as_attachment=True, download_name=f"Report_{lesson_desc}.pdf")
-
+    return send_file(output, mimetype='application/pdf', as_attachment=True, download_name=f"ROL_{lesson_desc}.pdf")
+    
 @app.route('/dashboard')
 def render_dashboard():
     return render_template('dashboard.html')

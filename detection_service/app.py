@@ -17,7 +17,6 @@ db = client.get_database()
 def detect():
     now = datetime.datetime.now()
     today = now.strftime("%Y-%m-%d")
-    current_time = now.strftime("%H:%M")
     timestamp = now.strftime("%H:%M:%S")
 
     # 1. VERIFICA SESSIONE ATTIVA
@@ -30,26 +29,24 @@ def detect():
     if not file: return jsonify({'message': 'Immagine mancante'}), 400
     
     filename_id = file.filename.split(".")[0].lower()
-    student = db.students.find_one({"filename": filename_id})
-    
+    student = db.users.find_one({"username": filename_id, "role": "student"})    
     if not student:
         return jsonify({'message': f'STUDENTE NON RICONOSCIUTO: {filename_id} non in anagrafica'}), 404
 
-    student_name = student['name']
+    full_name = f"{student['nome']} {student['cognome']}"
 
-    # 3. LOGICA TOGGLE PRESENZA (ENTRATA/USCITA)
-    active_presence = db.presenze.find_one({"student_name": student_name, "date": today, "exit_time": None})
-    
-    if active_presence:
-        db.presenze.update_one({"_id": active_presence["_id"]}, {"$set": {"exit_time": timestamp, "status": "Uscito"}})
-        return jsonify({"student_name": student_name, "status": "Uscita", "message": f"Uscita: {student_name}"}), 200
+    # 3. LOGICA TOGGLE PRESENZA
+    presence = db.presenze.find_one({"username": filename_id, "date": today, "exit_time": None})
+    if presence:
+        db.presenze.update_one({"_id": presence["_id"]}, {"$set": {"exit_time": timestamp, "status": "Uscito"}})
+        return jsonify({"message": f"Arrivederci {full_name}"}), 200
     else:
         db.presenze.insert_one({
-            "student_name": student_name, "date": today, "entry_time": timestamp, 
-            "exit_time": None, "status": "Presente", 
+            "username": filename_id, "student_name": full_name, "date": today,
+            "entry_time": timestamp, "exit_time": None, "status": "Presente",
             "teacher": lesson['teacher'], "lesson": lesson['description']
         })
-        return jsonify({"student_name": student_name, "status": "Entrata", "message": f"Ingresso: {student_name}"}), 200
-
+        return jsonify({"message": f"Benvenuto {full_name}"}), 200
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
