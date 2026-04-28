@@ -18,7 +18,7 @@ MONGO_URI = os.getenv('MONGO_URI', 'mongodb://mongodb:27017/attendance_system')
 client = MongoClient(MONGO_URI)
 db = client.get_database()
 
-# --- DECORATOR PER PROTEGGERE LE ROTTE ---
+# --- DECORATORE PER PROTEGGERE LE ROTTE ---
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -31,7 +31,7 @@ def token_required(f):
         return f(current_user, *args, **kwargs)
     return decorated
 
-# --- CHIUSURA AUTOMATICA PER SCADENZA ORARIO ---
+# --- CHIUSURA AUTOMATICA LEZIONE PER SCADENZA ORARIO ---
 def auto_check_expiry():
     now = datetime.datetime.now()
     today = now.strftime("%Y-%m-%d")

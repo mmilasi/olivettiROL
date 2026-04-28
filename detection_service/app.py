@@ -9,7 +9,6 @@ from pymongo import MongoClient
 app = Flask(__name__)
 CORS(app)
 
-# Configurazione MongoDB
 MONGO_URI = os.getenv('MONGO_URI', 'mongodb://mongodb:27017/attendance_system')
 client = MongoClient(MONGO_URI)
 db = client.get_database()
@@ -29,7 +28,6 @@ def detect():
     file = request.files.get('image')
     if not file: 
         return jsonify({'message': 'Immagine mancante'}), 400
-    
     try:
         unknown_image = face_recognition.load_image_file(file)
         unknown_encodings = face_recognition.face_encodings(unknown_image)
@@ -42,18 +40,14 @@ def detect():
     current_face_encoding = unknown_encodings[0]
 
     # 3. CONFRONTO AI
-    # Recuperiamo tutti gli studenti che hanno un profilo biometrico salvato
+    # Recupero di tutti gli studenti che hanno un profilo biometrico salvato
     students = list(db.users.find({"role": "student", "face_encoding": {"$ne": None}}))
-    
     if not students:
         return jsonify({'message': 'Anagrafica biometrica vuota'}), 404
-
-    # Creiamo la lista dei vettori noti
+    # Creazione della lista dei vettori noti
     known_encodings = [np.array(s['face_encoding']) for s in students]
-
-    # L'AI confronta i volti: restituisce una lista di True/False
+    # Confronto di volti e restituzione di una lista di True/False
     results = face_recognition.compare_faces(known_encodings, current_face_encoding, tolerance=0.6)
-
     if True in results:
         match_index = results.index(True)
         student = students[match_index]
@@ -64,7 +58,6 @@ def detect():
 
     # 4. LOGICA TOGGLE PRESENZA
     presence = db.presenze.find_one({"username": filename_id, "date": today, "exit_time": None})
-    
     if presence:
         db.presenze.update_one({"_id": presence["_id"]}, {"$set": {"exit_time": timestamp, "status": "Uscito"}})
         return jsonify({"message": f"Arrivederci {full_name}"}), 200

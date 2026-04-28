@@ -4,7 +4,7 @@ import numpy as np
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash
 
-# 1. Connessione globale
+# 1. Connessione al database
 client = MongoClient('mongodb://attendance_db:27017/')
 db = client.get_database('attendance_system')
 
@@ -31,9 +31,7 @@ def init_db():
         })
     print(f"✅ {len(teachers)} Docenti creati.")
 
-    # 3. Popolamento Studenti (per la simulazione del riconoscimento del Totem)
-    # NOTA: Il 'filename' corrisponde al nome della foto che viene caricata nel Totem per lo scopo di simulazione senza uso di
-    # tecnologie di riconoscimento facciale reali. In un caso reale, questa parte sarebbe gestita da un sistema di riconoscimento facciale.
+    # 3. Popolamento Studenti
     raw_students = [
             {"student_id": "S001", "name": "Giacomo Boni", "filename": "boni", "metadata": {"corso": "Cloud DevOps 24/26", "fuorisede": "no", "stato": "attivo"}},
             {"student_id": "S002", "name": "Francesco Pucci Mamone", "filename": "pucci", "metadata": {"corso": "Cloud DevOps 24/26", "fuorisede": "no", "stato": "attivo"}},
@@ -58,7 +56,7 @@ def init_db():
         nome = name_parts[0]
         cognome = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
 
-        # --- LOGICA AI: Estrazione lineamenti ---
+        # --- LOGICA AI: estrazione lineamenti in base alla foto assegnata ed associata allo studente ---
         encoding = None
         path_img = f"img_students/{s['filename']}.jpg"
         

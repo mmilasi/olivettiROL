@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# Installazione dipendenze di sistema (Corrette per Debian Bookworm)
+# Installazione dipendenze di sistema
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
@@ -12,11 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-
-# Copia e installazione requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir --default-timeout=100 -r requirements.txt
-
 COPY . .
-
 CMD ["python", "app.py"]

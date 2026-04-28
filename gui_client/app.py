@@ -15,7 +15,7 @@ class AttendanceTotem(FluentWindow):
         self.SESSION_URL = "http://127.0.0.1:5001/api/active_session"
         self.DETECT_URL = "http://127.0.0.1:5002/detect"
         
-        self.setWindowTitle("ITS Totem - Terminale Presenze")
+        self.setWindowTitle("ROL Totem - Terminale Presenze")
         self.resize(500, 700) 
         self.navigationInterface.hide() 
         self.hBoxLayout.setContentsMargins(0, 0, 0, 0)
@@ -75,7 +75,6 @@ class AttendanceTotem(FluentWindow):
         self.addSubInterface(self.central_widget, FIF.HOME, 'Totem')
 
     def get_rounded_pixmap(self, pixmap, radius):
-        """Applica il clipping agli angoli della Pixmap per farla stare nei bordi arrotondati"""
         target = QPixmap(pixmap.size())
         target.fill(Qt.GlobalColor.transparent)
         

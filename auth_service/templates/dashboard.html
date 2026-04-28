@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ITS Dashboard - Gestione Presenze</title>
+    <title>ITS Dashboard - ROL - Registro OffLine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -14,8 +14,8 @@
     
     <div id="login-section" class="flex items-center justify-center min-h-screen">
         <div class="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md text-center border border-slate-100">
-            <h1 class="text-4xl font-black text-indigo-600 mb-2 italic tracking-tighter">ITS CLOUD</h1>
-            <h2 class="text-xl font-bold mb-8 text-slate-400 uppercase tracking-widest text-sm">Portal Login Docente</h2>
+            <h1 class="text-4xl font-black text-indigo-600 mb-2 italic tracking-tighter">Registro OffLine</h1>
+            <h2 class="text-xl font-bold mb-8 text-slate-400 uppercase tracking-widest text-sm">Login Docente</h2>
             <div class="space-y-4">
                 <input type="text" id="user" placeholder="Username" class="w-full p-4 bg-slate-100 rounded-2xl outline-none border border-transparent focus:border-indigo-500 transition-all">
                 <input type="password" id="pass" placeholder="Password" class="w-full p-4 bg-slate-100 rounded-2xl outline-none border border-transparent focus:border-indigo-500 transition-all">
@@ -27,7 +27,7 @@
     <div id="main-dashboard" class="hidden">
         <nav class="bg-white border-b p-6 flex justify-between items-center px-12 sticky top-0 z-50 shadow-sm">
             <div>
-                <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tighter italic">ITS <span class="text-indigo-600">Cloud</span></h1>
+                <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tighter italic">Registro <span class="text-indigo-600">OffLine</span></h1>
                 <p id="nav-date" class="text-[10px] text-slate-400 font-black uppercase tracking-widest"></p>
             </div>
             <div class="flex items-center gap-6">
@@ -82,7 +82,7 @@
                 </div>
 
                 <div class="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                    <h3 class="text-lg font-bold mb-6 text-slate-800">Lezioni Odierne</h3>
+                    <h3 class="text-lg font-bold mb-6 text-slate-800">Storico Lezioni</h3>
                     <div id="history-list" class="space-y-3"></div>
                 </div>
             </div>
@@ -100,7 +100,7 @@
                     <div>
                         <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Stato Presenza</label>
                         <select id="filter-stato" class="w-full p-3 bg-white rounded-xl border-none shadow-sm text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500">
-                            <option value="">Tutti (Pres. + Ass.)</option>
+                            <option value="">Tutti</option>
                             <option value="presenti">Solo Presenti</option>
                             <option value="assenti">Solo Assenti</option>
                         </select>
@@ -129,7 +129,7 @@
                                 <th class="pb-6 text-left">Studente</th>
                                 <th class="pb-6 text-center">Entrata</th>
                                 <th class="pb-6 text-center">Uscita</th>
-                                <th class="pb-6 text-right">Stato</th>
+                                <th class="pb-6 text-right">Presenza</th>
                             </tr>
                         </thead>
                         <tbody id="student-list" class="divide-y divide-slate-50">
@@ -292,7 +292,6 @@
             const fuori = document.getElementById('filter-fuori').value;
             const ritirati = document.getElementById('filter-ritirati').checked;
 
-            // Costruzione URL con parametri di filtro
             let url = `/api/export_pdf?teacher=${currentView.teacher}&lesson=${encodeURIComponent(currentView.lesson)}`;
             
             if(stato) url += `&stato=${stato}`;
