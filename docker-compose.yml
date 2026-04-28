@@ -18,6 +18,8 @@ services:
       - "5001:5000"
     depends_on:
       - mongodb
+    volumes:
+      - ./img_students:/app/img_students  
     environment:
       - MONGO_URI=mongodb://mongodb:27017/attendance_system
       - JWT_SECRET=super_secret_its_2026
@@ -32,6 +34,8 @@ services:
       - "5002:5000"
     depends_on:
       - mongodb
+    volumes:
+      - ./img_students:/app/img_students
     networks:
       - attendance_net
     environment:
