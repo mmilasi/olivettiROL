@@ -11,6 +11,10 @@ Se sei su Windows, puoi avviare l'intero progetto (inclusa l'installazione dei p
 Lo script installerà Python e Docker Desktop se non presenti, configurerà Docker, installerà le librerie necessarie e aprirà automaticamente Dashboard e Totem. 
 In caso di installazione di Python o Docker sarà neccessario riavviare il .bat (sempre come amministratore).
 
+## 🔑 Credenziali docente simulate per dimostrazione
+1. username: `stefano.castagnoli`
+2. password: `password123`
+
 ---
 
 ## 🛠️ Architettura e Tecnologie
